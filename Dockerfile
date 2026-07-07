@@ -1,17 +1,16 @@
 # syntax=docker/dockerfile:1.4
 #
-# ساخت:
-#   docker build -t salon-platform .
+# ── Dokploy ──────────────────────────────────────────────────────────────
+# 1. DNS: رکورد A → IP سرور (بدون پورت — DNS پورت ندارد)
+# 2. Dokploy → Domains → Create Domain:
+#      Host: test.xpaydar.ir
+#      Path: /
+#      Container Port: 80
+#      HTTPS: ON
+# 3. بخش Advanced → Ports را خالی بگذارید (تداخل ایجاد می‌کند)
+# 4. آدرس: https://test.xpaydar.ir  (بدون :پورت)
 #
-# اجرا (لوکال):
-#   docker run -d --name salon -p 8080:80 salon-platform
-#
-# اجرا (پروداکشن):
-#   docker run -d --name salon -p 80:80 \
-#     -e APP_URL=https://test.xpaydar.ir \
-#     -v salon-data:/var/www/html/backend/storage \
-#     --restart unless-stopped \
-#     salon-platform
+# ساخت:  docker build -t salon-platform .
 
 # ── Stage 1: بیلد فرانت‌اند (وب + پنل ادمین) ─────────────────────────────
 FROM node:20-alpine AS frontend-build
@@ -55,8 +54,11 @@ ENV ADMIN_NAME="مدیر"
 
 COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
-    ServerName localhost
     DocumentRoot /var/www/html
+
+    # پشت Traefik/Dokploy
+    SetEnvIf X-Forwarded-Proto "https" HTTPS=on
+    SetEnvIf X-Forwarded-Host "^(.+)$" HTTP_HOST=$1
 
     Alias /assets /var/www/html/backend/public/assets
     Alias /admin/assets /var/www/html/backend/public/admin/assets
