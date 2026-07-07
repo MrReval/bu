@@ -6,9 +6,9 @@
 # اجرا (لوکال):
 #   docker run -d --name salon -p 8080:80 salon-platform
 #
-# اجرا (پروداکشن با دامنه):
+# اجرا (پروداکشن):
 #   docker run -d --name salon -p 80:80 \
-#     -e APP_URL=https://yourdomain.com \
+#     -e APP_URL=https://test.xpaydar.ir \
 #     -v salon-data:/var/www/html/backend/storage \
 #     --restart unless-stopped \
 #     salon-platform
@@ -47,11 +47,11 @@ COPY --from=frontend-build /build/backend/public/web ./backend/public/web
 COPY --from=frontend-build /build/backend/public/admin ./backend/public/admin
 COPY --from=frontend-build /build/backend/public/assets ./backend/public/assets
 
-ENV APP_URL=http://localhost \
-    SALON_NAME=سالن زیبایی \
-    ADMIN_EMAIL=admin@salon.local \
-    ADMIN_PASSWORD=admin123 \
-    ADMIN_NAME=مدیر
+ENV APP_URL=https://test.xpaydar.ir
+ENV SALON_NAME="سالن زیبایی"
+ENV ADMIN_EMAIL=admin@salon.local
+ENV ADMIN_PASSWORD=admin123
+ENV ADMIN_NAME="مدیر"
 
 COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
