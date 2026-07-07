@@ -1,0 +1,13 @@
+{
+    "name": "salon/platform",
+    "description": "Beauty salon booking platform",
+    "type": "project",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Salon\\": "src/"
+        }
+    }
+}

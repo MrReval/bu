@@ -1,0 +1,8 @@
+backend/vendor/
+backend/.env
+backend/storage/database.sqlite
+backend/storage/installed.lock
+backend/public/web/
+backend/public/admin/
+frontend/node_modules/
+*.log
