@@ -34,7 +34,15 @@ export async function api(path, options = {}) {
     // اگر پاسخ JSON نبود (مثلاً HTML خطا/پروکسی)، باید خطا بدهیم تا UI به object خالی تبدیل نشود
     throw new Error('پاسخ نامعتبر از سرور دریافت شد');
   }
-  if (!res.ok) throw new Error(data?.error || 'خطا در ارتباط با سرور');
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearAuth();
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+        window.location.replace('/admin/login');
+      }
+    }
+    throw new Error(data?.error || 'خطا در ارتباط با سرور');
+  }
   return data;
 }
 

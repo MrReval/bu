@@ -78,6 +78,9 @@ COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
         Require all granted
 
         RewriteEngine On
+        # ارسال Authorization به PHP (رفع 401 در پروداکشن)
+        RewriteCond %{HTTP:Authorization} ^(.+)$
+        RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
         # روت / خودش یک دایرکتوری است — باید صریح به router.php برود
         RewriteRule ^$ router.php [L]
         RewriteCond %{REQUEST_FILENAME} -f

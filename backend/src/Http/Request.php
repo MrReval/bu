@@ -39,6 +39,22 @@ final class Request
             }
         }
 
+        // Apache + mod_rewrite معمولاً Authorization را به PHP نمی‌رساند
+        if (empty($headers['authorization'])) {
+            if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+                $headers['authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
+            } elseif (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+                $headers['authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            } elseif (function_exists('apache_request_headers')) {
+                $apache = apache_request_headers();
+                if (is_array($apache)) {
+                    foreach ($apache as $k => $v) {
+                        $headers[strtolower((string) $k)] = $v;
+                    }
+                }
+            }
+        }
+
         return new self($method, $path, $_GET, $body, $headers, null);
     }
 
