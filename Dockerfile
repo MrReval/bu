@@ -76,7 +76,10 @@ COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
         Require all granted
 
         RewriteEngine On
-        RewriteCond %{REQUEST_FILENAME} -f [OR]
+        # روت / خودش یک دایرکتوری است — باید صریح به router.php برود
+        RewriteRule ^$ router.php [L]
+        RewriteCond %{REQUEST_FILENAME} -f
+        RewriteRule ^ - [L]
         RewriteCond %{REQUEST_FILENAME} -d
         RewriteRule ^ - [L]
         RewriteRule ^ router.php [L]
