@@ -52,6 +52,7 @@ ENV SALON_NAME="سالن زیبایی"
 ENV ADMIN_EMAIL=admin@salon.local
 ENV ADMIN_PASSWORD=admin123
 ENV ADMIN_NAME="مدیر"
+ENV FORCE_IMPORT=0
 
 COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
@@ -99,6 +100,7 @@ COPY <<'EOF' /usr/local/bin/entrypoint.sh
 #!/bin/sh
 set -e
 
+IMPORT_DIR="/var/www/html/import"
 STORAGE="/var/www/html/backend/storage"
 ENV_FILE="/var/www/html/backend/.env"
 LOCK_FILE="${STORAGE}/installed.lock"
@@ -110,17 +112,47 @@ SERVER_NAME=$(echo "${APP_URL}" | sed -e 's|^[^/]*//||' -e 's|:.*||' -e 's|/.*||
 echo "ServerName ${SERVER_NAME}" > /etc/apache2/conf-available/docker-servername.conf
 a2enconf docker-servername >/dev/null 2>&1 || true
 
-if [ ! -f "${LOCK_FILE}" ]; then
+# ایمپورت دیتابیس و فایل‌های آپلود از پوشه import (داخل ایمیج)
+if [ -f "${IMPORT_DIR}/database.sqlite" ]; then
+  if [ "${FORCE_IMPORT}" = "1" ] || [ ! -f "${STORAGE}/database.sqlite" ]; then
+    if [ "${FORCE_IMPORT}" = "1" ] || [ ! -f "${STORAGE}/import-seed.lock" ]; then
+        echo ">> ایمپورت دیتابیس و فایل‌ها از import/..."
+        cp "${IMPORT_DIR}/database.sqlite" "${STORAGE}/database.sqlite"
+        mkdir -p "${STORAGE}/uploads"
+        if [ -d "${IMPORT_DIR}/uploads" ]; then
+            cp -r "${IMPORT_DIR}/uploads/." "${STORAGE}/uploads/"
+        fi
+        if [ -f "${IMPORT_DIR}/installed.lock" ]; then
+            cp "${IMPORT_DIR}/installed.lock" "${LOCK_FILE}"
+        elif [ ! -f "${LOCK_FILE}" ]; then
+            date -Iseconds > "${LOCK_FILE}"
+        fi
+        if [ -f "${IMPORT_DIR}/.env" ]; then
+            cp "${IMPORT_DIR}/.env" "${ENV_FILE}"
+        fi
+        date -Iseconds > "${STORAGE}/import-seed.lock"
+        chown -R www-data:www-data "${STORAGE}"
+        echo ">> ایمپورت انجام شد."
+    fi
+  fi
+fi
+
+# نصب اولیه فقط وقتی هیچ دیتابیسی وجود ندارد
+if [ ! -f "${LOCK_FILE}" ] && [ ! -f "${STORAGE}/database.sqlite" ]; then
     echo ">> نصب اولیه..."
     php /var/www/html/scripts/install-cli.php \
         "${SALON_NAME}" "${ADMIN_EMAIL}" "${ADMIN_PASSWORD}" "${ADMIN_NAME}"
     chown -R www-data:www-data "${STORAGE}"
     echo ">> ورود: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}"
+elif [ ! -f "${LOCK_FILE}" ]; then
+    date -Iseconds > "${LOCK_FILE}"
+    echo ">> دیتابیس موجود است، از نصب مجدد صرف‌نظر شد."
 fi
 
 if [ -f "${ENV_FILE}" ]; then
     sed -i "s|^APP_URL=.*|APP_URL=${APP_URL}|" "${ENV_FILE}"
     sed -i "s|^APP_ENV=.*|APP_ENV=production|" "${ENV_FILE}"
+    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${STORAGE}/database.sqlite|" "${ENV_FILE}"
 fi
 
 echo ">> آماده: ${APP_URL}/  |  پنل: ${APP_URL}/admin/"
