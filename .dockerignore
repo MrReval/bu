@@ -1,6 +1,7 @@
 .git
 .gitignore
 **/.env
+!import/.env
 backend/storage/database.sqlite
 backend/storage/installed.lock
 backend/storage/uploads/*

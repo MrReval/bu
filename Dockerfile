@@ -41,6 +41,7 @@ COPY backend/ ./backend/
 COPY installer/ ./installer/
 COPY scripts/ ./scripts/
 COPY router.php VERSION ./
+COPY import/ ./import/
 
 COPY --from=frontend-build /build/backend/public/web ./backend/public/web
 COPY --from=frontend-build /build/backend/public/admin ./backend/public/admin
