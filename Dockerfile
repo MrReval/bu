@@ -1,4 +1,17 @@
 # syntax=docker/dockerfile:1.4
+#
+# ساخت:
+#   docker build -t salon-platform .
+#
+# اجرا (لوکال):
+#   docker run -d --name salon -p 8080:80 salon-platform
+#
+# اجرا (پروداکشن با دامنه):
+#   docker run -d --name salon -p 80:80 \
+#     -e APP_URL=https://yourdomain.com \
+#     -v salon-data:/var/www/html/backend/storage \
+#     --restart unless-stopped \
+#     salon-platform
 
 # ── Stage 1: بیلد فرانت‌اند (وب + پنل ادمین) ─────────────────────────────
 FROM node:20-alpine AS frontend-build
@@ -10,8 +23,6 @@ RUN cd frontend && npm ci
 
 COPY frontend/ ./frontend/
 
-# خروجی Vite → backend/public/{web,admin}
-# فایل‌های CSS/JS وب در /assets ارجاع داده می‌شوند؛ کپی به مسیر درست
 RUN cd frontend && npm run build \
     && cp -r ../backend/public/web/assets ../backend/public/assets
 
@@ -36,7 +47,12 @@ COPY --from=frontend-build /build/backend/public/web ./backend/public/web
 COPY --from=frontend-build /build/backend/public/admin ./backend/public/admin
 COPY --from=frontend-build /build/backend/public/assets ./backend/public/assets
 
-# پیکربندی Apache: استاتیک مستقیم، بقیه از router.php
+ENV APP_URL=http://localhost \
+    SALON_NAME=سالن زیبایی \
+    ADMIN_EMAIL=admin@salon.local \
+    ADMIN_PASSWORD=admin123 \
+    ADMIN_NAME=مدیر
+
 COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
     ServerName localhost
@@ -73,7 +89,6 @@ COPY <<'EOF' /etc/apache2/sites-available/000-default.conf
 </VirtualHost>
 EOF
 
-# نصب خودکار در اولین اجرا
 COPY <<'EOF' /usr/local/bin/entrypoint.sh
 #!/bin/sh
 set -e
@@ -85,22 +100,24 @@ LOCK_FILE="${STORAGE}/installed.lock"
 mkdir -p "${STORAGE}/uploads"
 chown -R www-data:www-data "${STORAGE}"
 
-APP_URL="${APP_URL:-http://localhost:8080}"
-SALON_NAME="${SALON_NAME:-سالن زیبایی}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@salon.local}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin123}"
-ADMIN_NAME="${ADMIN_NAME:-مدیر}"
+SERVER_NAME=$(echo "${APP_URL}" | sed -e 's|^[^/]*//||' -e 's|:.*||' -e 's|/.*||')
+echo "ServerName ${SERVER_NAME}" > /etc/apache2/conf-available/docker-servername.conf
+a2enconf docker-servername >/dev/null 2>&1 || true
 
 if [ ! -f "${LOCK_FILE}" ]; then
     echo ">> نصب اولیه..."
     php /var/www/html/scripts/install-cli.php \
         "${SALON_NAME}" "${ADMIN_EMAIL}" "${ADMIN_PASSWORD}" "${ADMIN_NAME}"
-    sed -i "s|^APP_URL=.*|APP_URL=${APP_URL}|" "${ENV_FILE}"
-    sed -i "s|^APP_ENV=.*|APP_ENV=production|" "${ENV_FILE}"
     chown -R www-data:www-data "${STORAGE}"
-    echo ">> آماده: ${APP_URL}/  |  پنل: ${APP_URL}/admin/"
     echo ">> ورود: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}"
 fi
+
+if [ -f "${ENV_FILE}" ]; then
+    sed -i "s|^APP_URL=.*|APP_URL=${APP_URL}|" "${ENV_FILE}"
+    sed -i "s|^APP_ENV=.*|APP_ENV=production|" "${ENV_FILE}"
+fi
+
+echo ">> آماده: ${APP_URL}/  |  پنل: ${APP_URL}/admin/"
 
 exec apache2-foreground
 EOF
@@ -109,6 +126,11 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
     && mkdir -p backend/storage/uploads \
     && chown -R www-data:www-data backend/storage
 
+VOLUME ["/var/www/html/backend/storage"]
+
 EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost/api/v1/settings/public || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
