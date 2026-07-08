@@ -28,18 +28,23 @@ if (UploadHelper::serveIfUpload($path)) {
 }
 
 // فایل‌های استاتیک (JS/CSS/تصاویر بیلد فرانت)
-if (preg_match('#\.(js|css|ico|png|jpg|jpeg|svg|woff2?|map|webp)$#', $path)) {
-    $file = __DIR__ . $path;
-    if (is_file($file)) {
-        $ext = pathinfo($file, PATHINFO_EXTENSION);
-        $types = [
-            'js' => 'application/javascript', 'css' => 'text/css', 'svg' => 'image/svg+xml',
-            'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg',
-            'ico' => 'image/x-icon', 'webp' => 'image/webp', 'woff' => 'font/woff', 'woff2' => 'font/woff2',
-        ];
-        header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
-        readfile($file);
-        exit;
+// علاوه بر ریشه‌ی public، پوشه‌ی وب هم بررسی می‌شود تا اسِت‌های عمومی وب
+// (مثل /defaults/hero.jpg و /favicon.ico) درست سرو شوند.
+if (preg_match('#\.(js|css|ico|png|jpg|jpeg|svg|woff2?|map|webp)$#', $path) && !str_contains($path, '..')) {
+    $types = [
+        'js' => 'application/javascript', 'css' => 'text/css', 'svg' => 'image/svg+xml',
+        'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg',
+        'ico' => 'image/x-icon', 'webp' => 'image/webp', 'woff' => 'font/woff', 'woff2' => 'font/woff2',
+        'map' => 'application/json', 'gif' => 'image/gif',
+    ];
+    foreach ([__DIR__ . $path, __DIR__ . '/web' . $path] as $file) {
+        if (is_file($file)) {
+            $ext = pathinfo($file, PATHINFO_EXTENSION);
+            header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
+            header('Cache-Control: public, max-age=86400');
+            readfile($file);
+            exit;
+        }
     }
 }
 
