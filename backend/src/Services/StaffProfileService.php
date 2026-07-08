@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Salon\Services;
 
 use Salon\Database\Connection;
+use Salon\Tenant\TenantContext;
 
 final class StaffProfileService
 {
@@ -20,8 +21,8 @@ final class StaffProfileService
     public static function getPublicProfile(int $id): array
     {
         $pdo = Connection::get();
-        $stmt = $pdo->prepare('SELECT s.* FROM staff s WHERE s.id = ?');
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare('SELECT s.* FROM staff s WHERE s.id = ? AND s.site_id = ?');
+        $stmt->execute([$id, TenantContext::siteId()]);
         $row = $stmt->fetch();
         if (!$row) {
             throw new \InvalidArgumentException('پرسنل یافت نشد');
@@ -81,8 +82,8 @@ final class StaffProfileService
         }
         if ($role === 'staff') {
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('SELECT id FROM staff WHERE user_id = ?');
-            $stmt->execute([(int) $user['id']]);
+            $stmt = $pdo->prepare('SELECT id FROM staff WHERE user_id = ? AND site_id = ?');
+            $stmt->execute([(int) $user['id'], TenantContext::siteId()]);
             $own = $stmt->fetchColumn();
             if ($own && (int) $own === $staffId) {
                 return;

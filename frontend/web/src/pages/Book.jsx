@@ -105,6 +105,17 @@ export default function Book({ settings }) {
 
   const totalPrice = services.filter((s) => isSelected(s.id)).reduce((a, s) => a + s.price, 0);
   const totalDuration = services.filter((s) => isSelected(s.id)).reduce((a, s) => a + s.duration_minutes, 0);
+  const depositEstimate =
+    settings.deposit_enabled && settings.payment_enabled
+      ? Math.round(
+          services
+            .filter((s) => isSelected(s.id))
+            .reduce((a, s) => {
+              const pct = Number(s.deposit_percent) > 0 ? Number(s.deposit_percent) : Number(settings.default_deposit_percent || 0);
+              return a + (pct > 0 ? (s.price * pct) / 100 : 0);
+            }, 0)
+        )
+      : 0;
 
   const submit = async () => {
     setError('');
@@ -124,6 +135,21 @@ export default function Book({ settings }) {
       const res = await fetch('/api/v1/appointments', { method: 'POST', headers, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      // اگر بیعانه لازم است و درگاه فعال است، به زیبال هدایت شود
+      const depositAmount = Number(data.deposit_amount || 0);
+      if (settings.payment_enabled && depositAmount > 0 && data.deposit_status === 'pending') {
+        try {
+          const pay = await fetch(`/api/v1/payments/deposit/${data.id}`, { method: 'POST', headers });
+          const payData = await pay.json();
+          if (pay.ok && payData.url) {
+            window.location.href = payData.url;
+            return;
+          }
+        } catch {
+          // اگر پرداخت ناموفق بود، نوبت ثبت‌شده را نمایش بده
+        }
+      }
       setDone(data);
     } catch (e) {
       setError(e.message);
@@ -466,9 +492,14 @@ export default function Book({ settings }) {
                 <p><strong>پرسنل:</strong> {slot.staff_name}</p>
                 <p><strong>خدمات:</strong> {services.filter((s) => isSelected(s.id)).map((s) => s.name).join('، ')}</p>
                 <p className="text-lg font-bold pt-2" style={{ color: primary }}>{formatPrice(totalPrice)}</p>
+                {depositEstimate > 0 && (
+                  <p className="text-sm font-medium text-amber-700 bg-amber-50 rounded-xl px-3 py-2 mt-2">
+                    بیعانه قابل پرداخت آنلاین: {formatPrice(depositEstimate)}
+                  </p>
+                )}
               </div>
               <button type="button" disabled={submitting} onClick={submit} className="w-full py-4 rounded-2xl text-white font-bold disabled:opacity-60" style={{ backgroundColor: primary }}>
-                {submitting ? 'در حال ثبت...' : 'تأیید و ثبت نوبت'}
+                {submitting ? 'در حال ثبت...' : depositEstimate > 0 ? 'تأیید و پرداخت بیعانه' : 'تأیید و ثبت نوبت'}
               </button>
             </div>
           )}

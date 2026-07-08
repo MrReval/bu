@@ -11,6 +11,8 @@ import Gallery from './pages/Gallery';
 import Settings from './pages/Settings';
 import Customers from './pages/Customers';
 import Notifications from './pages/Notifications';
+import SmsSettings from './pages/SmsSettings';
+import PaymentSettings from './pages/PaymentSettings';
 
 function Private({ children }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -39,6 +41,8 @@ export default function App() {
                   <Route path="/staff" element={<Staff />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="/customers" element={<Customers />} />
+                  <Route path="/sms" element={<SmsSettings />} />
+                  <Route path="/payment" element={<PaymentSettings />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Layout>

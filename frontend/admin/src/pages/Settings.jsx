@@ -96,6 +96,8 @@ export default function Settings() {
           logo_path: s.logo_path || '',
           about_html: s.about_html,
           is_booking_enabled: s.is_booking_enabled ? 1 : 0,
+          deposit_enabled: s.deposit_enabled ? 1 : 0,
+          default_deposit_percent: +(s.default_deposit_percent || 0),
           business_hours_json: JSON.stringify(normalizeBusinessHours(s._hours)),
           booking_rules_json: JSON.stringify(s._rules),
         }),
@@ -442,6 +444,32 @@ export default function Settings() {
                   value={s._rules.min_notice_hours ?? 2}
                   onChange={(e) => setS({ ...s, _rules: { ...s._rules, min_notice_hours: +e.target.value } })}
                 />
+              </div>
+
+              <label className="flex items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-2xl">
+                <div>
+                  <p className="font-semibold text-slate-800">دریافت بیعانه هنگام رزرو</p>
+                  <p className="text-xs text-slate-500 mt-0.5">نیازمند فعال بودن درگاه پرداخت زیبال است.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={s.deposit_enabled == 1}
+                  onChange={(e) => setS({ ...s, deposit_enabled: e.target.checked ? 1 : 0 })}
+                  className="w-5 h-5 accent-pink-600"
+                />
+              </label>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label className="block text-xs font-medium text-slate-500 mb-2">درصد بیعانه پیش‌فرض (٪)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className={`${inputClass} w-40`}
+                  value={s.default_deposit_percent ?? 0}
+                  onChange={(e) => setS({ ...s, default_deposit_percent: +e.target.value })}
+                />
+                <p className="text-xs text-slate-400 mt-2">اگر برای خدمتی درصد جداگانه تعیین نشده باشد، این درصد اعمال می‌شود.</p>
               </div>
             </div>
           </div>

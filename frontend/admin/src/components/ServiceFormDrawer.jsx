@@ -134,6 +134,23 @@ export default function ServiceFormDrawer({
             </div>
 
             <div>
+              <label className="block text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
+                <Banknote className="w-3.5 h-3.5" />
+                درصد بیعانه (٪) — برای دریافت بیعانه این خدمت
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={form.deposit_percent ?? 0}
+                onChange={(e) => setForm({ ...form, deposit_percent: e.target.value })}
+                className={inputClass}
+                placeholder="۰ = استفاده از درصد پیش‌فرض سالن"
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-medium text-slate-500 mb-2">توضیحات</label>
               <textarea
                 placeholder="توضیح کوتاه برای نمایش در سایت (اختیاری)"

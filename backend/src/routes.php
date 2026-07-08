@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Salon\Controllers\AdminController;
 use Salon\Controllers\AppointmentController;
 use Salon\Controllers\AuthController;
+use Salon\Controllers\IntegrationController;
+use Salon\Controllers\PaymentController;
 use Salon\Controllers\PublicController;
 use Salon\Router;
 
@@ -24,6 +26,10 @@ return function (Router $router): void {
     $router->post('/api/v1/appointments', [AppointmentController::class, 'create']);
     $router->get('/api/v1/me/appointments', [AppointmentController::class, 'myAppointments'], ['customer']);
     $router->patch('/api/v1/appointments/{id}/cancel', [AppointmentController::class, 'cancel'], ['customer', 'staff', 'manager', 'super_admin']);
+
+    // پرداخت بیعانه (زیبال)
+    $router->post('/api/v1/payments/deposit/{id}', [PaymentController::class, 'startDeposit']);
+    $router->get('/api/v1/payments/callback', [PaymentController::class, 'callback']);
 
     $admin = ['manager', 'super_admin'];
     $staffAdmin = ['staff', 'manager', 'super_admin'];
@@ -70,4 +76,11 @@ return function (Router $router): void {
     $router->get('/api/v1/admin/system/info', [AdminController::class, 'systemInfo'], $admin);
     $router->get('/api/v1/admin/system/update/status', [AdminController::class, 'updateStatus'], $admin);
     $router->post('/api/v1/admin/system/update/start', [AdminController::class, 'startUpdate'], $admin);
+
+    // یکپارچه‌سازی‌ها: پیامک و درگاه پرداخت (وابسته به فیچر پکیج)
+    $router->get('/api/v1/admin/sms', [IntegrationController::class, 'getSms'], $admin);
+    $router->patch('/api/v1/admin/sms', [IntegrationController::class, 'updateSms'], $admin);
+    $router->post('/api/v1/admin/sms/test', [IntegrationController::class, 'testSms'], $admin);
+    $router->get('/api/v1/admin/payment', [IntegrationController::class, 'getPayment'], $admin);
+    $router->patch('/api/v1/admin/payment', [IntegrationController::class, 'updatePayment'], $admin);
 };

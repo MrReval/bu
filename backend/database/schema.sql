@@ -1,208 +1,379 @@
-PRAGMA foreign_keys = ON;
+-- ─────────────────────────────────────────────────────────────────────────
+-- پلتفرم چند‌سالنی (Multi-tenant) — MySQL 8
+-- ─────────────────────────────────────────────────────────────────────────
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ── جدول‌های پلتفرم (سوپرادمین) ────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS sites (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(191) NOT NULL,
+    domain VARCHAR(191) NOT NULL UNIQUE,
+    slug VARCHAR(191) NOT NULL DEFAULT 'salon',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    package_id INT NULL,
+    expires_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS platform_admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(191) NOT NULL,
+    email VARCHAR(191) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS platform_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    token VARCHAR(191) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES platform_admins(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS features (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feature_key VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(191) NOT NULL,
+    description VARCHAR(255) NOT NULL DEFAULT '',
+    sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS packages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(191) NOT NULL,
+    description VARCHAR(255) NOT NULL DEFAULT '',
+    price_monthly BIGINT NOT NULL DEFAULT 0,
+    price_yearly BIGINT NOT NULL DEFAULT 0,
+    is_active TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS package_features (
+    package_id INT NOT NULL,
+    feature_id INT NOT NULL,
+    PRIMARY KEY (package_id, feature_id),
+    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    package_id INT NULL,
+    period VARCHAR(20) NOT NULL DEFAULT 'monthly',
+    amount BIGINT NOT NULL DEFAULT 0,
+    starts_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NULL,
+    note VARCHAR(255) NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- تنظیمات پیامک سطح پلتفرم (سوپرادمین)
+CREATE TABLE IF NOT EXISTS platform_sms_settings (
+    id INT PRIMARY KEY,
+    provider VARCHAR(30) NOT NULL DEFAULT 'melipayamak',
+    is_enabled TINYINT NOT NULL DEFAULT 0,
+    credentials_json TEXT NOT NULL DEFAULT ('{}'),
+    patterns_json TEXT NOT NULL DEFAULT ('{}'),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── جدول‌های سالن (اسکوپ‌شده با site_id) ───────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE,
-    phone TEXT UNIQUE,
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'customer' CHECK(role IN ('super_admin','manager','staff','customer')),
-    name TEXT NOT NULL,
-    is_verified INTEGER NOT NULL DEFAULT 1,
-    last_login_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    email VARCHAR(191),
+    phone VARCHAR(30),
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'customer',
+    name VARCHAR(191) NOT NULL,
+    is_verified TINYINT NOT NULL DEFAULT 1,
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_users_site_phone (site_id, phone),
+    UNIQUE KEY uq_users_site_email (site_id, email),
+    KEY idx_users_site (site_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS api_tokens (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    token TEXT NOT NULL UNIQUE,
-    expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    user_id INT NOT NULL,
+    token VARCHAR(191) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_tokens_site (site_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS salon_settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    name TEXT NOT NULL DEFAULT 'سالن زیبایی',
-    slug TEXT NOT NULL DEFAULT 'salon',
-    phone TEXT DEFAULT '',
-    address TEXT DEFAULT '',
-    timezone TEXT NOT NULL DEFAULT 'Asia/Tehran',
-    logo_path TEXT,
-    favicon_path TEXT,
-    primary_color TEXT NOT NULL DEFAULT '#be185d',
-    secondary_color TEXT NOT NULL DEFAULT '#831843',
-    accent_color TEXT NOT NULL DEFAULT '#f472b6',
-    font_family TEXT NOT NULL DEFAULT 'Vazirmatn',
-    hero_title TEXT NOT NULL DEFAULT 'به سالن زیبایی ما خوش آمدید',
-    hero_subtitle TEXT NOT NULL DEFAULT 'زیبایی شما، تخصص ما',
-    hero_image TEXT,
-    about_html TEXT DEFAULT '',
-    social_links_json TEXT NOT NULL DEFAULT '{}',
-    business_hours_json TEXT NOT NULL DEFAULT '{}',
-    booking_rules_json TEXT NOT NULL DEFAULT '{"min_notice_hours":2,"allow_staff_selection":true,"auto_confirm":true}',
-    is_booking_enabled INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    site_id INT NOT NULL PRIMARY KEY,
+    name VARCHAR(191) NOT NULL DEFAULT 'سالن زیبایی',
+    slug VARCHAR(191) NOT NULL DEFAULT 'salon',
+    phone VARCHAR(30) DEFAULT '',
+    address VARCHAR(255) DEFAULT '',
+    timezone VARCHAR(60) NOT NULL DEFAULT 'Asia/Tehran',
+    logo_path VARCHAR(255),
+    favicon_path VARCHAR(255),
+    primary_color VARCHAR(20) NOT NULL DEFAULT '#be185d',
+    secondary_color VARCHAR(20) NOT NULL DEFAULT '#831843',
+    accent_color VARCHAR(20) NOT NULL DEFAULT '#f472b6',
+    font_family VARCHAR(60) NOT NULL DEFAULT 'Vazirmatn',
+    hero_title VARCHAR(255) NOT NULL DEFAULT 'به سالن زیبایی ما خوش آمدید',
+    hero_subtitle VARCHAR(255) NOT NULL DEFAULT 'زیبایی شما، تخصص ما',
+    hero_image VARCHAR(255),
+    about_html TEXT,
+    social_links_json TEXT NOT NULL DEFAULT ('{}'),
+    business_hours_json TEXT NOT NULL DEFAULT ('{}'),
+    booking_rules_json TEXT NOT NULL DEFAULT ('{"min_notice_hours":2,"allow_staff_selection":true,"auto_confirm":true}'),
+    is_booking_enabled TINYINT NOT NULL DEFAULT 1,
+    deposit_enabled TINYINT NOT NULL DEFAULT 0,
+    default_deposit_percent INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS landing_sections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK(type IN ('hero','services','gallery','testimonials','faq','cta','about','custom_html')),
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    is_visible INTEGER NOT NULL DEFAULT 1,
-    config_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    type VARCHAR(30) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_visible TINYINT NOT NULL DEFAULT 1,
+    config_json TEXT NOT NULL DEFAULT ('{}'),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_sections_site (site_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS service_categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    is_active INTEGER NOT NULL DEFAULT 1
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    name VARCHAR(191) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT NOT NULL DEFAULT 1,
+    KEY idx_categories_site (site_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category_id INTEGER,
-    name TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    duration_minutes INTEGER NOT NULL DEFAULT 30,
-    price REAL NOT NULL DEFAULT 0,
-    price_type TEXT NOT NULL DEFAULT 'fixed' CHECK(price_type IN ('fixed','from')),
-    is_active INTEGER NOT NULL DEFAULT 1,
-    image_path TEXT,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    category_id INT,
+    name VARCHAR(191) NOT NULL,
+    description TEXT,
+    duration_minutes INT NOT NULL DEFAULT 30,
+    price DOUBLE NOT NULL DEFAULT 0,
+    price_type VARCHAR(20) NOT NULL DEFAULT 'fixed',
+    deposit_percent INT NOT NULL DEFAULT 0,
+    is_active TINYINT NOT NULL DEFAULT 1,
+    image_path VARCHAR(255),
+    KEY idx_services_site (site_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES service_categories(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE,
-    display_name TEXT NOT NULL,
-    bio TEXT DEFAULT '',
-    avatar_path TEXT,
-    specialties_json TEXT NOT NULL DEFAULT '[]',
-    color_hex TEXT NOT NULL DEFAULT '#be185d',
-    is_accepting_bookings INTEGER NOT NULL DEFAULT 1,
-    satisfaction_percent INTEGER NOT NULL DEFAULT 98,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    user_id INT UNIQUE,
+    display_name VARCHAR(191) NOT NULL,
+    bio TEXT,
+    avatar_path VARCHAR(255),
+    specialties_json TEXT NOT NULL DEFAULT ('[]'),
+    color_hex VARCHAR(20) NOT NULL DEFAULT '#be185d',
+    is_accepting_bookings TINYINT NOT NULL DEFAULT 1,
+    satisfaction_percent INT NOT NULL DEFAULT 98,
+    KEY idx_staff_site (site_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS gallery_images (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    file_path TEXT NOT NULL,
-    caption TEXT DEFAULT '',
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    caption VARCHAR(255) DEFAULT '',
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_gallery_site (site_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_portfolio (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    staff_id INTEGER NOT NULL,
-    file_path TEXT NOT NULL,
-    caption TEXT DEFAULT '',
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    staff_id INT NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    caption VARCHAR(255) DEFAULT '',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_portfolio_site (site_id),
     FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS service_staff (
-    service_id INTEGER NOT NULL,
-    staff_id INTEGER NOT NULL,
+    service_id INT NOT NULL,
+    staff_id INT NOT NULL,
     PRIMARY KEY (service_id, staff_id),
     FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
     FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_working_hours (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    staff_id INTEGER,
-    day_of_week INTEGER NOT NULL CHECK(day_of_week BETWEEN 0 AND 6),
-    start_time TEXT NOT NULL,
-    end_time TEXT NOT NULL,
-    breaks_json TEXT NOT NULL DEFAULT '[]',
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staff_id INT,
+    day_of_week INT NOT NULL,
+    start_time VARCHAR(10) NOT NULL,
+    end_time VARCHAR(10) NOT NULL,
+    breaks_json TEXT NOT NULL DEFAULT ('[]'),
     FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_time_off (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    staff_id INTEGER NOT NULL,
-    start_at TEXT NOT NULL,
-    end_at TEXT NOT NULL,
-    reason TEXT DEFAULT '',
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staff_id INT NOT NULL,
+    start_at DATETIME NOT NULL,
+    end_at DATETIME NOT NULL,
+    reason VARCHAR(255) DEFAULT '',
     FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customers (
-    user_id INTEGER PRIMARY KEY,
-    notes TEXT DEFAULT '',
-    birth_date TEXT,
-    marketing_opt_in INTEGER NOT NULL DEFAULT 0,
+    user_id INT PRIMARY KEY,
+    notes TEXT,
+    birth_date VARCHAR(20),
+    marketing_opt_in TINYINT NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS appointments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmed','in_progress','completed','cancelled','no_show')),
-    start_at TEXT NOT NULL,
-    end_at TEXT NOT NULL,
-    total_price REAL NOT NULL DEFAULT 0,
-    deposit_amount REAL NOT NULL DEFAULT 0,
-    notes_customer TEXT DEFAULT '',
-    notes_internal TEXT DEFAULT '',
-    source TEXT NOT NULL DEFAULT 'web' CHECK(source IN ('web','admin','walk_in')),
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    start_at DATETIME NOT NULL,
+    end_at DATETIME NOT NULL,
+    total_price DOUBLE NOT NULL DEFAULT 0,
+    deposit_amount DOUBLE NOT NULL DEFAULT 0,
+    deposit_status VARCHAR(20) NOT NULL DEFAULT 'none',
+    notes_customer TEXT,
+    notes_internal TEXT,
+    source VARCHAR(20) NOT NULL DEFAULT 'web',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_appointments_site (site_id),
+    KEY idx_appointments_start (start_at),
+    KEY idx_appointments_customer (customer_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (customer_id) REFERENCES users(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS appointment_services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    appointment_id INTEGER NOT NULL,
-    service_id INTEGER NOT NULL,
-    staff_id INTEGER,
-    duration_minutes INTEGER NOT NULL,
-    price_snapshot REAL NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    appointment_id INT NOT NULL,
+    service_id INT NOT NULL,
+    staff_id INT,
+    duration_minutes INT NOT NULL,
+    price_snapshot DOUBLE NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
     FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES services(id),
     FOREIGN KEY (staff_id) REFERENCES staff(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS appointment_status_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    appointment_id INTEGER NOT NULL,
-    old_status TEXT,
-    new_status TEXT NOT NULL,
-    changed_by INTEGER,
-    changed_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
-    FOREIGN KEY (changed_by) REFERENCES users(id)
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    appointment_id INT NOT NULL,
+    old_status VARCHAR(20),
+    new_status VARCHAR(20) NOT NULL,
+    changed_by INT,
+    changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS blocked_slots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    staff_id INTEGER,
-    start_at TEXT NOT NULL,
-    end_at TEXT NOT NULL,
-    reason TEXT DEFAULT '',
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staff_id INT,
+    start_at DATETIME NOT NULL,
+    end_at DATETIME NOT NULL,
+    reason VARCHAR(255) DEFAULT '',
     FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS notifications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    type TEXT NOT NULL,
-    title TEXT NOT NULL,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    user_id INT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(191) NOT NULL,
     body TEXT NOT NULL,
-    payload_json TEXT NOT NULL DEFAULT '{}',
-    read_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    payload_json TEXT NOT NULL DEFAULT ('{}'),
+    read_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_notifications_site (site_id),
+    KEY idx_notifications_user (user_id, read_at),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS idx_appointments_start ON appointments(start_at);
-CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at);
+-- ── تنظیمات پیامک و پرداخت هر سایت ──────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS site_sms_settings (
+    site_id INT NOT NULL PRIMARY KEY,
+    provider VARCHAR(30) NOT NULL DEFAULT 'melipayamak',
+    is_enabled TINYINT NOT NULL DEFAULT 0,
+    credentials_json TEXT NOT NULL DEFAULT ('{}'),
+    patterns_json TEXT NOT NULL DEFAULT ('{}'),
+    events_json TEXT NOT NULL DEFAULT ('{}'),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_payment_settings (
+    site_id INT NOT NULL PRIMARY KEY,
+    provider VARCHAR(30) NOT NULL DEFAULT 'zibal',
+    zibal_merchant VARCHAR(191) NOT NULL DEFAULT '',
+    is_enabled TINYINT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    appointment_id INT NULL,
+    amount BIGINT NOT NULL DEFAULT 0,
+    provider VARCHAR(30) NOT NULL DEFAULT 'zibal',
+    track_id VARCHAR(100) NULL,
+    ref_number VARCHAR(100) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_payments_site (site_id),
+    KEY idx_payments_track (track_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sms_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NULL,
+    phone VARCHAR(30) NOT NULL,
+    message TEXT NOT NULL,
+    provider VARCHAR(30) NOT NULL DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'sent',
+    response TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_smslogs_site (site_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

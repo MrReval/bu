@@ -7,9 +7,13 @@ namespace Salon;
 use Salon\Http\Request;
 use Salon\Http\Response;
 use Salon\Middleware\AuthMiddleware;
+use Salon\Middleware\PlatformAuthMiddleware;
 
 final class Router
 {
+    /** نشانگر مسیرهای نیازمند احراز هویت سوپرادمین پلتفرم */
+    public const PLATFORM = '@platform';
+
     /** @var array<string, array<string, callable>> */
     private array $routes = [];
 
@@ -58,7 +62,9 @@ final class Router
             }
 
             $req = $request;
-            if ($route['roles'] !== null) {
+            if ($route['roles'] === [self::PLATFORM]) {
+                $req = PlatformAuthMiddleware::handle($request);
+            } elseif ($route['roles'] !== null) {
                 $req = AuthMiddleware::handle($request, $route['roles']);
             }
 
@@ -72,7 +78,7 @@ final class Router
   /** @return array<string, string>|null */
     private function match(string $pattern, string $path): ?array
     {
-        $regex = preg_replace('/\{([a-z_]+)\}/', '(?P<$1>[^/]+)', $pattern);
+        $regex = preg_replace('/\{([a-zA-Z_]+)\}/', '(?P<$1>[^/]+)', $pattern);
         $regex = '#^' . $regex . '$#';
         if (!preg_match($regex, $path, $m)) {
             return null;

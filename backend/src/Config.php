@@ -28,6 +28,11 @@ final class Config
 
     public static function get(string $key, ?string $default = null): ?string
     {
+        // متغیرهای محیطی سیستم (Docker/Dokploy) بر فایل .env اولویت دارند
+        $env = getenv($key);
+        if ($env !== false && $env !== '') {
+            return $env;
+        }
         return self::$data[$key] ?? $default;
     }
 
@@ -41,13 +46,46 @@ final class Config
         return self::basePath() . '/storage';
     }
 
-    public static function dbPath(): string
+    // ── اتصال MySQL ─────────────────────────────────────────────────────
+    public static function dbHost(): string
     {
-        $path = self::get('DB_DATABASE');
-        if ($path && is_file($path)) {
-            return $path;
-        }
-        return self::storagePath() . '/database.sqlite';
+        return self::get('DB_HOST', '127.0.0.1');
+    }
+
+    public static function dbPort(): string
+    {
+        return self::get('DB_PORT', '3306');
+    }
+
+    public static function dbName(): string
+    {
+        return self::get('DB_NAME', self::get('DB_DATABASE', 'salon'));
+    }
+
+    public static function dbUser(): string
+    {
+        return self::get('DB_USER', self::get('DB_USERNAME', 'root'));
+    }
+
+    public static function dbPassword(): string
+    {
+        return self::get('DB_PASS', self::get('DB_PASSWORD', ''));
+    }
+
+    public static function dbDsn(): string
+    {
+        return sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+            self::dbHost(),
+            self::dbPort(),
+            self::dbName()
+        );
+    }
+
+    // ── دامنه پنل سوپرادمین ──────────────────────────────────────────────
+    public static function superAdminDomain(): string
+    {
+        return strtolower(self::get('SUPERADMIN_DOMAIN', 'l.xpaydar.ir'));
     }
 
     public static function isInstalled(): bool
@@ -58,5 +96,10 @@ final class Config
     public static function appKey(): string
     {
         return self::get('APP_KEY', 'change-me-in-production');
+    }
+
+    public static function appUrl(): string
+    {
+        return rtrim(self::get('APP_URL', ''), '/');
     }
 }

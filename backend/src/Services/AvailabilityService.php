@@ -7,22 +7,24 @@ namespace Salon\Services;
 use DateInterval;
 use DateTime;
 use Salon\Database\Connection;
-use Salon\Database\Migrator;
+use Salon\Tenant\TenantContext;
 
 final class AvailabilityService
 {
     public static function getSlots(array $serviceIds, ?int $staffId, string $date): array
     {
-        Migrator::ensureStaffWorkingHours();
         $pdo = Connection::get();
-        $settings = $pdo->query('SELECT * FROM salon_settings WHERE id = 1')->fetch();
+        $siteId = TenantContext::siteId();
+        $stmt = $pdo->prepare('SELECT * FROM salon_settings WHERE site_id = ?');
+        $stmt->execute([$siteId]);
+        $settings = $stmt->fetch();
         $hours = BusinessHoursService::decode($settings['business_hours_json'] ?? '{}');
         $rules = json_decode($settings['booking_rules_json'] ?? '{}', true);
         $slotMinutes = 15;
 
         $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
-        $stmt = $pdo->prepare("SELECT * FROM services WHERE id IN ($placeholders) AND is_active = 1");
-        $stmt->execute($serviceIds);
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE site_id = ? AND id IN ($placeholders) AND is_active = 1");
+        $stmt->execute(array_merge([$siteId], $serviceIds));
         $services = $stmt->fetchAll();
         if (count($services) !== count($serviceIds)) {
             throw new \InvalidArgumentException('خدمات نامعتبر');
@@ -79,11 +81,12 @@ final class AvailabilityService
     private static function resolveStaff(array $serviceIds, ?int $staffId): array
     {
         $pdo = Connection::get();
+        $siteId = TenantContext::siteId();
         if ($staffId) {
             $stmt = $pdo->prepare(
-                'SELECT s.* FROM staff s WHERE s.id = ? AND s.is_accepting_bookings = 1'
+                'SELECT s.* FROM staff s WHERE s.id = ? AND s.site_id = ? AND s.is_accepting_bookings = 1'
             );
-            $stmt->execute([$staffId]);
+            $stmt->execute([$staffId, $siteId]);
             $staff = $stmt->fetch();
             return $staff ? [$staff] : [];
         }
@@ -92,15 +95,17 @@ final class AvailabilityService
         $stmt = $pdo->prepare(
             "SELECT DISTINCT s.* FROM staff s
              JOIN service_staff ss ON ss.staff_id = s.id
-             WHERE ss.service_id IN ($ph) AND s.is_accepting_bookings = 1"
+             WHERE s.site_id = ? AND ss.service_id IN ($ph) AND s.is_accepting_bookings = 1"
         );
-        $stmt->execute($serviceIds);
+        $stmt->execute(array_merge([$siteId], $serviceIds));
         $list = $stmt->fetchAll();
         if (!empty($list)) {
             return $list;
         }
 
-        return $pdo->query('SELECT * FROM staff WHERE is_accepting_bookings = 1')->fetchAll();
+        $stmt = $pdo->prepare('SELECT * FROM staff WHERE site_id = ? AND is_accepting_bookings = 1');
+        $stmt->execute([$siteId]);
+        return $stmt->fetchAll();
     }
 
     private static function getStaffHours(int $staffId, int $day, string $defaultOpen, string $defaultClose): ?array

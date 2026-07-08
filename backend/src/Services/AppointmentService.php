@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace Salon\Services;
 
 use Salon\Database\Connection;
+use Salon\Tenant\TenantContext;
 
 final class AppointmentService
 {
     public static function create(array $data, ?int $customerId = null): array
     {
         $pdo = Connection::get();
-        $settings = $pdo->query('SELECT * FROM salon_settings WHERE id = 1')->fetch();
-        if (!(int) $settings['is_booking_enabled']) {
+        $siteId = TenantContext::siteId();
+        $stmt = $pdo->prepare('SELECT * FROM salon_settings WHERE site_id = ?');
+        $stmt->execute([$siteId]);
+        $settings = $stmt->fetch();
+        if (!$settings || !(int) $settings['is_booking_enabled']) {
             throw new \InvalidArgumentException('رزرو آنلاین غیرفعال است');
         }
 
@@ -33,8 +37,8 @@ final class AppointmentService
             if ($name === '' || $phone === '') {
                 throw new \InvalidArgumentException('نام و موبایل الزامی است');
             }
-            $existing = $pdo->prepare('SELECT id FROM users WHERE phone = ?');
-            $existing->execute([$phone]);
+            $existing = $pdo->prepare('SELECT id FROM users WHERE site_id = ? AND phone = ?');
+            $existing->execute([$siteId, $phone]);
             $row = $existing->fetch();
             if ($row) {
                 $customerId = (int) $row['id'];
@@ -49,11 +53,17 @@ final class AppointmentService
         }
 
         $ph = implode(',', array_fill(0, count($serviceIds), '?'));
-        $stmt = $pdo->prepare("SELECT * FROM services WHERE id IN ($ph)");
-        $stmt->execute($serviceIds);
+        $stmt = $pdo->prepare("SELECT * FROM services WHERE site_id = ? AND id IN ($ph)");
+        $stmt->execute(array_merge([$siteId], $serviceIds));
         $services = $stmt->fetchAll();
+        if (empty($services)) {
+            throw new \InvalidArgumentException('خدمات نامعتبر');
+        }
         $totalDuration = array_sum(array_column($services, 'duration_minutes'));
         $totalPrice = array_sum(array_column($services, 'price'));
+
+        $depositAmount = self::calcDeposit($services, $settings);
+        $depositStatus = $depositAmount > 0 ? 'pending' : 'none';
 
         $start = new \DateTime($startAt);
         $end = (clone $start)->modify("+{$totalDuration} minutes");
@@ -68,14 +78,17 @@ final class AppointmentService
         $pdo->beginTransaction();
         try {
             $pdo->prepare(
-                'INSERT INTO appointments (customer_id, status, start_at, end_at, total_price, notes_customer, source)
-                 VALUES (?, ?, ?, ?, ?, ?, "web")'
+                'INSERT INTO appointments (site_id, customer_id, status, start_at, end_at, total_price, deposit_amount, deposit_status, notes_customer, source)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "web")'
             )->execute([
+                $siteId,
                 $customerId,
                 $status,
                 $start->format('Y-m-d H:i:s'),
                 $end->format('Y-m-d H:i:s'),
                 $totalPrice,
+                $depositAmount,
+                $depositStatus,
                 $notes,
             ]);
             $appointmentId = (int) $pdo->lastInsertId();
@@ -111,18 +124,40 @@ final class AppointmentService
         } else {
             NotificationService::notifyManagersNewAppointment($appointmentId);
         }
+        SmsService::onNewAppointment($appointmentId);
 
         return self::getById($appointmentId);
+    }
+
+    /** محاسبه بیعانه بر اساس درصد سرویس یا پیش‌فرض سالن */
+    private static function calcDeposit(array $services, array $settings): float
+    {
+        if (empty($settings['deposit_enabled'])) {
+            return 0.0;
+        }
+        $default = (int) ($settings['default_deposit_percent'] ?? 0);
+        $total = 0.0;
+        foreach ($services as $svc) {
+            $percent = (int) ($svc['deposit_percent'] ?? 0);
+            if ($percent <= 0) {
+                $percent = $default;
+            }
+            if ($percent > 0) {
+                $total += ((float) $svc['price']) * $percent / 100;
+            }
+        }
+        return round($total);
     }
 
     public static function getById(int $id): array
     {
         $pdo = Connection::get();
+        $siteId = TenantContext::siteId();
         $stmt = $pdo->prepare(
             'SELECT a.*, u.name as customer_name, u.phone as customer_phone
-             FROM appointments a JOIN users u ON u.id = a.customer_id WHERE a.id = ?'
+             FROM appointments a JOIN users u ON u.id = a.customer_id WHERE a.id = ? AND a.site_id = ?'
         );
-        $stmt->execute([$id]);
+        $stmt->execute([$id, $siteId]);
         $apt = $stmt->fetch();
         if (!$apt) {
             throw new \InvalidArgumentException('نوبت یافت نشد');
@@ -147,20 +182,22 @@ final class AppointmentService
         }
 
         $pdo = Connection::get();
-        $old = $pdo->prepare('SELECT status, customer_id FROM appointments WHERE id = ?');
-        $old->execute([$id]);
+        $siteId = TenantContext::siteId();
+        $old = $pdo->prepare('SELECT status, customer_id FROM appointments WHERE id = ? AND site_id = ?');
+        $old->execute([$id, $siteId]);
         $row = $old->fetch();
         if (!$row) {
             throw new \InvalidArgumentException('نوبت یافت نشد');
         }
 
-        $pdo->prepare('UPDATE appointments SET status = ?, updated_at = datetime("now") WHERE id = ?')
-            ->execute([$status, $id]);
+        $pdo->prepare('UPDATE appointments SET status = ?, updated_at = NOW() WHERE id = ? AND site_id = ?')
+            ->execute([$status, $id, $siteId]);
         $pdo->prepare(
             'INSERT INTO appointment_status_history (appointment_id, old_status, new_status, changed_by) VALUES (?, ?, ?, ?)'
         )->execute([$id, $row['status'], $status, $changedBy]);
 
         NotificationService::notifyCustomerStatus($id, (int) $row['customer_id'], $status);
+        SmsService::onStatusChange($id, $status);
 
         return self::getById($id);
     }
@@ -168,20 +205,21 @@ final class AppointmentService
     public static function list(array $filters = []): array
     {
         $pdo = Connection::get();
+        $siteId = TenantContext::siteId();
         $sql = 'SELECT a.*, u.name as customer_name, u.phone as customer_phone FROM appointments a
-                JOIN users u ON u.id = a.customer_id WHERE 1=1';
-        $params = [];
+                JOIN users u ON u.id = a.customer_id WHERE a.site_id = ?';
+        $params = [$siteId];
 
         if (!empty($filters['staff_id'])) {
             $sql .= ' AND EXISTS (SELECT 1 FROM appointment_services aps WHERE aps.appointment_id = a.id AND aps.staff_id = ?)';
             $params[] = $filters['staff_id'];
         }
         if (!empty($filters['date_from'])) {
-            $sql .= ' AND date(a.start_at) >= date(?)';
+            $sql .= ' AND DATE(a.start_at) >= DATE(?)';
             $params[] = $filters['date_from'];
         }
         if (!empty($filters['date_to'])) {
-            $sql .= ' AND date(a.start_at) <= date(?)';
+            $sql .= ' AND DATE(a.start_at) <= DATE(?)';
             $params[] = $filters['date_to'];
         }
         if (!empty($filters['status'])) {

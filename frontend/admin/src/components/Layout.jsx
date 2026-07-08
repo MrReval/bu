@@ -13,6 +13,8 @@ import {
   X,
   Sparkles,
   Image,
+  MessageSquare,
+  CreditCard,
 } from 'lucide-react';
 import { api, clearAuth, getUser } from '../../../shared/api';
 import { replaceGregorianDatesWithJalali } from '../../../shared/utils';
@@ -43,18 +45,21 @@ const NAV = [
   { to: '/notifications', label: 'اعلان‌ها', icon: Bell },
   { to: '/services', label: 'خدمات', icon: Scissors, roles: ['super_admin', 'manager'] },
   { to: '/staff', label: 'پرسنل', icon: Users, roles: ['super_admin', 'manager', 'staff'] },
-  { to: '/gallery', label: 'گالری سایت', icon: Image, roles: ['super_admin', 'manager'] },
+  { to: '/gallery', label: 'گالری سایت', icon: Image, roles: ['super_admin', 'manager'], feature: 'gallery' },
   { to: '/customers', label: 'مشتریان', icon: UserCircle, roles: ['super_admin', 'manager'] },
+  { to: '/sms', label: 'پیامک', icon: MessageSquare, roles: ['super_admin', 'manager'], feature: 'sms' },
+  { to: '/payment', label: 'درگاه پرداخت', icon: CreditCard, roles: ['super_admin', 'manager'], feature: 'deposit' },
   { to: '/settings', label: 'تنظیمات', icon: Settings, roles: ['super_admin', 'manager'] },
 ];
 
-function NavLinks({ onNavigate }) {
+function NavLinks({ onNavigate, features }) {
   const loc = useLocation();
   const user = getUser();
   const can = (roles) => !roles || roles.includes(user?.role);
+  const hasFeature = (f) => !f || (Array.isArray(features) && features.includes(f));
   const isActive = (to) => (to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to));
 
-  return NAV.filter((n) => can(n.roles)).map((n) => {
+  return NAV.filter((n) => can(n.roles) && hasFeature(n.feature)).map((n) => {
     const Icon = n.icon;
     const active = isActive(n.to);
     return (
@@ -79,7 +84,14 @@ export default function Layout({ children }) {
   const user = getUser();
   const [unread, setUnread] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [features, setFeatures] = useState(null);
   const loc = useLocation();
+
+  useEffect(() => {
+    api('/settings/public')
+      .then((s) => setFeatures(Array.isArray(s?.features) ? s.features : []))
+      .catch(() => setFeatures([]));
+  }, []);
   const notifiedIdsRef = useRef(loadNotifiedIds());
   const firstPollRef = useRef(true);
 
@@ -178,7 +190,7 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <NavLinks onNavigate={() => setSidebarOpen(false)} />
+          <NavLinks onNavigate={() => setSidebarOpen(false)} features={features} />
         </nav>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50/80">

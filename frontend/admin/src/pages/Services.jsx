@@ -5,7 +5,7 @@ import { getCategoryIconComponent } from '../../../shared/categoryIcons';
 import { useToast } from '../context/Toast';
 import ServiceFormDrawer from '../components/ServiceFormDrawer';
 
-const empty = { name: '', description: '', duration_minutes: 30, price: 0, category_id: '', is_active: 1 };
+const empty = { name: '', description: '', duration_minutes: 30, price: 0, category_id: '', deposit_percent: 0, is_active: 1 };
 
 export default function Services() {
   const [data, setData] = useState({ categories: [], services: [] });
@@ -75,6 +75,7 @@ export default function Services() {
         category_id: form.category_id || null,
         price: +form.price,
         duration_minutes: +form.duration_minutes,
+        deposit_percent: +(form.deposit_percent || 0),
         is_active: +form.is_active,
       };
       if (editId) {

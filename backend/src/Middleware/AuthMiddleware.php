@@ -7,6 +7,7 @@ namespace Salon\Middleware;
 use Salon\Database\Connection;
 use Salon\Http\Request;
 use Salon\Http\Response;
+use Salon\Tenant\TenantContext;
 
 final class AuthMiddleware
 {
@@ -17,11 +18,12 @@ final class AuthMiddleware
             Response::error('احراز هویت لازم است', 401);
         }
 
+        $siteId = TenantContext::siteId();
         $stmt = Connection::get()->prepare(
             'SELECT u.* FROM api_tokens t JOIN users u ON u.id = t.user_id
-             WHERE t.token = ? AND t.expires_at > datetime("now")'
+             WHERE t.token = ? AND t.site_id = ? AND t.expires_at > NOW()'
         );
-        $stmt->execute([$token]);
+        $stmt->execute([$token, $siteId]);
         $user = $stmt->fetch();
         if (!$user) {
             Response::error('توکن نامعتبر', 401);

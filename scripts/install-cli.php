@@ -2,49 +2,66 @@
 
 declare(strict_types=1);
 
-/** نصب خط فرمان: php scripts/install-cli.php */
+/**
+ * نصب خط فرمان (MySQL چند‌سالنی).
+ * استفاده:
+ *   php scripts/install-cli.php <superName> <superEmail> <superPass> \
+ *       [firstSiteName] [firstSiteDomain] [firstAdminEmail] [firstAdminPass]
+ * اتصال MySQL از متغیرهای محیطی DB_* خوانده می‌شود.
+ */
 
 $root = dirname(__DIR__);
 $backend = $root . '/backend';
 require $backend . '/bootstrap.php';
 
-$salonName = $argv[1] ?? 'سالن زیبایی نمونه';
-$adminEmail = $argv[2] ?? 'admin@salon.local';
-$adminPassword = $argv[3] ?? 'admin123';
-$adminName = $argv[4] ?? 'مدیر';
+use Salon\Config;
+use Salon\Database\Connection;
+use Salon\Database\Migrator;
+use Salon\Services\PlatformAuthService;
+use Salon\Services\SiteService;
+
+Config::load($backend . '/.env');
+
+$superName = $argv[1] ?? 'مدیر پلتفرم';
+$superEmail = $argv[2] ?? 'super@platform.local';
+$superPass = $argv[3] ?? 'super1234';
+
+$siteName = $argv[4] ?? '';
+$siteDomain = $argv[5] ?? '';
+$siteAdminEmail = $argv[6] ?? '';
+$siteAdminPass = $argv[7] ?? '';
 
 $storage = $backend . '/storage';
 @mkdir($storage . '/uploads', 0755, true);
-$dbPath = $storage . '/database.sqlite';
-if (is_file($dbPath)) {
-    unlink($dbPath);
+
+echo ">> اجرای مهاجرت اسکیمای MySQL...\n";
+Migrator::run();
+
+echo ">> ساخت مدیر پلتفرم (در صورت نبود)...\n";
+PlatformAuthService::ensureFirstAdmin($superName, $superEmail, $superPass);
+
+$pdo = Connection::get();
+$siteCount = (int) $pdo->query('SELECT COUNT(*) FROM sites')->fetchColumn();
+
+if ($siteCount === 0 && $siteName !== '' && $siteDomain !== '') {
+    echo ">> ساخت اولین سایت: {$siteDomain}\n";
+    try {
+        SiteService::create([
+            'name' => $siteName,
+            'domain' => $siteDomain,
+            'admin_name' => 'مدیر',
+            'admin_email' => $siteAdminEmail ?: ('admin@' . $siteDomain),
+            'admin_password' => $siteAdminPass ?: 'admin123',
+        ]);
+    } catch (\Throwable $e) {
+        echo "!! خطا در ساخت سایت: " . $e->getMessage() . "\n";
+    }
 }
 
-$appKey = bin2hex(random_bytes(16));
-file_put_contents($backend . '/.env', "APP_ENV=local\nAPP_KEY={$appKey}\nAPP_URL=http://127.0.0.1:8080\nDB_DATABASE={$dbPath}\n");
-
-Salon\Config::load($backend . '/.env');
-Salon\Database\Connection::reset();
-Salon\Database\Migrator::run();
-Salon\Database\Migrator::seedDefaults();
-Salon\Database\Migrator::ensureCategories();
-
-$pdo = Salon\Database\Connection::get();
-$pdo->prepare('UPDATE salon_settings SET name = ? WHERE id = 1')->execute([$salonName]);
-$adminId = Salon\Services\AuthService::createAdmin($adminName, $adminEmail, $adminPassword, 'super_admin');
-$pdo->prepare('INSERT INTO staff (user_id, display_name, color_hex) VALUES (?, ?, ?)')->execute([$adminId, $adminName, '#be185d']);
-$staffId = (int) $pdo->lastInsertId();
-foreach ($pdo->query('SELECT id FROM services')->fetchAll() as $s) {
-    $pdo->prepare('INSERT INTO service_staff (service_id, staff_id) VALUES (?, ?)')->execute([$s['id'], $staffId]);
-}
-for ($d = 0; $d <= 6; $d++) {
-    $isFriday = ($d === 5);
-    $pdo->prepare('INSERT INTO staff_working_hours (staff_id, day_of_week, start_time, end_time) VALUES (?, ?, ?, ?)')
-        ->execute([$staffId, $d, $isFriday ? '00:00' : '09:00', $isFriday ? '00:00' : '21:00']);
-}
 file_put_contents($storage . '/installed.lock', date('c'));
 
 echo "OK\n";
-echo "Admin: {$adminEmail} / {$adminPassword}\n";
-echo "Web: http://127.0.0.1:8080/\n";
-echo "Admin panel: http://127.0.0.1:8080/admin/\n";
+echo "سوپرادمین: {$superEmail} / {$superPass}\n";
+if ($siteName !== '' && $siteDomain !== '') {
+    echo "سایت اول: https://{$siteDomain}/admin/  →  " . ($siteAdminEmail ?: ('admin@' . $siteDomain)) . " / " . ($siteAdminPass ?: 'admin123') . "\n";
+}

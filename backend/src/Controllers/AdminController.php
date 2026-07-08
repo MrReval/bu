@@ -7,7 +7,6 @@ namespace Salon\Controllers;
 use Salon\Database\Connection;
 use Salon\Http\Request;
 use Salon\Http\Response;
-use Salon\Database\Migrator;
 use Salon\Services\AppointmentService;
 use Salon\Services\AuthService;
 use Salon\Services\BusinessHoursService;
@@ -16,21 +15,30 @@ use Salon\Services\StaffProfileService;
 use Salon\Services\UpdateService;
 use Salon\Services\UploadService;
 use Salon\SystemInfo;
+use Salon\Tenant\TenantContext;
 
 final class AdminController
 {
+    private static function sid(): int
+    {
+        return TenantContext::siteId();
+    }
+
     public static function dashboard(Request $req): void
     {
         $pdo = Connection::get();
+        $sid = self::sid();
         $today = date('Y-m-d');
-        $todayCount = $pdo->prepare('SELECT COUNT(*) FROM appointments WHERE date(start_at) = date(?) AND status NOT IN ("cancelled")');
-        $todayCount->execute([$today]);
-        $pending = $pdo->query('SELECT COUNT(*) FROM appointments WHERE status = "pending"')->fetchColumn();
-        $customers = $pdo->query('SELECT COUNT(*) FROM users WHERE role = "customer"')->fetchColumn();
+        $todayCount = $pdo->prepare('SELECT COUNT(*) FROM appointments WHERE site_id = ? AND DATE(start_at) = DATE(?) AND status NOT IN ("cancelled")');
+        $todayCount->execute([$sid, $today]);
+        $pending = $pdo->prepare('SELECT COUNT(*) FROM appointments WHERE site_id = ? AND status = "pending"');
+        $pending->execute([$sid]);
+        $customers = $pdo->prepare('SELECT COUNT(*) FROM users WHERE site_id = ? AND role = "customer"');
+        $customers->execute([$sid]);
         Response::json([
             'appointments_today' => (int) $todayCount->fetchColumn(),
-            'pending' => (int) $pending,
-            'customers' => (int) $customers,
+            'pending' => (int) $pending->fetchColumn(),
+            'customers' => (int) $customers->fetchColumn(),
         ]);
     }
 
@@ -38,8 +46,8 @@ final class AdminController
     {
         $filters = [];
         if ($req->user['role'] === 'staff') {
-            $staff = Connection::get()->prepare('SELECT id FROM staff WHERE user_id = ?');
-            $staff->execute([$req->user['id']]);
+            $staff = Connection::get()->prepare('SELECT id FROM staff WHERE user_id = ? AND site_id = ?');
+            $staff->execute([$req->user['id'], self::sid()]);
             $s = $staff->fetch();
             if ($s) {
                 $filters['staff_id'] = (int) $s['id'];
@@ -66,11 +74,10 @@ final class AdminController
             Response::error('شناسه نامعتبر');
         }
 
-        // اگر کاربر staff باشد، فقط نوبت‌های مربوط به خودش را ببیند
         if (($req->user['role'] ?? '') === 'staff') {
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('SELECT id FROM staff WHERE user_id = ?');
-            $stmt->execute([(int) $req->user['id']]);
+            $stmt = $pdo->prepare('SELECT id FROM staff WHERE user_id = ? AND site_id = ?');
+            $stmt->execute([(int) $req->user['id'], self::sid()]);
             $staff = $stmt->fetch();
             if (!$staff) {
                 Response::error('پرسنل یافت نشد', 403);
@@ -105,13 +112,15 @@ final class AdminController
 
     public static function getSettings(Request $req): void
     {
-        Migrator::ensureSalonSettingsColumns();
         $pdo = Connection::get();
-        $row = $pdo->query('SELECT * FROM salon_settings WHERE id = 1')->fetch();
+        $sid = self::sid();
+        $stmt = $pdo->prepare('SELECT * FROM salon_settings WHERE site_id = ?');
+        $stmt->execute([$sid]);
+        $row = $stmt->fetch();
         if ($row && isset($row['business_hours_json'])) {
             $fixed = BusinessHoursService::normalizeJson((string) $row['business_hours_json']);
             if ($fixed !== null && $fixed !== $row['business_hours_json']) {
-                $pdo->prepare('UPDATE salon_settings SET business_hours_json = ?, updated_at = datetime("now") WHERE id = 1')->execute([$fixed]);
+                $pdo->prepare('UPDATE salon_settings SET business_hours_json = ?, updated_at = NOW() WHERE site_id = ?')->execute([$fixed, $sid]);
                 $row['business_hours_json'] = $fixed;
             }
         }
@@ -127,13 +136,16 @@ final class AdminController
                 $b['business_hours_json'] = $normalized;
             }
         }
-        Migrator::ensureSalonSettingsColumns();
         $fields = ['name', 'phone', 'address', 'primary_color', 'secondary_color', 'accent_color',
             'font_family', 'hero_title', 'hero_subtitle', 'hero_image', 'logo_path', 'about_html',
-            'social_links_json', 'business_hours_json', 'booking_rules_json', 'is_booking_enabled'];
+            'social_links_json', 'business_hours_json', 'booking_rules_json', 'is_booking_enabled',
+            'deposit_enabled', 'default_deposit_percent'];
         $pdo = Connection::get();
+        $sid = self::sid();
         if (array_key_exists('logo_path', $b) && ($b['logo_path'] === '' || $b['logo_path'] === null)) {
-            $oldLogo = $pdo->query('SELECT logo_path FROM salon_settings WHERE id = 1')->fetchColumn();
+            $q = $pdo->prepare('SELECT logo_path FROM salon_settings WHERE site_id = ?');
+            $q->execute([$sid]);
+            $oldLogo = $q->fetchColumn();
             UploadService::deleteByPath(is_string($oldLogo) ? $oldLogo : null);
         }
         $sets = [];
@@ -151,43 +163,51 @@ final class AdminController
         if (empty($sets)) {
             Response::error('داده‌ای ارسال نشده');
         }
-        $sets[] = 'updated_at = datetime("now")';
-        $vals[] = 1;
-        Connection::get()->prepare('UPDATE salon_settings SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($vals);
-        Response::json(Connection::get()->query('SELECT * FROM salon_settings WHERE id = 1')->fetch());
+        $sets[] = 'updated_at = NOW()';
+        $vals[] = $sid;
+        $pdo->prepare('UPDATE salon_settings SET ' . implode(', ', $sets) . ' WHERE site_id = ?')->execute($vals);
+        $stmt = $pdo->prepare('SELECT * FROM salon_settings WHERE site_id = ?');
+        $stmt->execute([$sid]);
+        Response::json($stmt->fetch());
     }
 
     public static function landingSections(Request $req): void
     {
-        $rows = Connection::get()->query('SELECT * FROM landing_sections ORDER BY sort_order')->fetchAll();
-        Response::json($rows);
+        $stmt = Connection::get()->prepare('SELECT * FROM landing_sections WHERE site_id = ? ORDER BY sort_order');
+        $stmt->execute([self::sid()]);
+        Response::json($stmt->fetchAll());
     }
 
     public static function updateLandingSection(Request $req, array $params): void
     {
         $id = (int) $params['id'];
+        $sid = self::sid();
         $b = $req->body;
         $config = isset($b['config']) ? json_encode($b['config'], JSON_UNESCAPED_UNICODE) : ($b['config_json'] ?? null);
         $pdo = Connection::get();
         if ($config !== null) {
-            $pdo->prepare('UPDATE landing_sections SET config_json = ? WHERE id = ?')->execute([$config, $id]);
+            $pdo->prepare('UPDATE landing_sections SET config_json = ? WHERE id = ? AND site_id = ?')->execute([$config, $id, $sid]);
         }
         if (isset($b['is_visible'])) {
-            $pdo->prepare('UPDATE landing_sections SET is_visible = ? WHERE id = ?')->execute([(int) $b['is_visible'], $id]);
+            $pdo->prepare('UPDATE landing_sections SET is_visible = ? WHERE id = ? AND site_id = ?')->execute([(int) $b['is_visible'], $id, $sid]);
         }
         if (isset($b['sort_order'])) {
-            $pdo->prepare('UPDATE landing_sections SET sort_order = ? WHERE id = ?')->execute([(int) $b['sort_order'], $id]);
+            $pdo->prepare('UPDATE landing_sections SET sort_order = ? WHERE id = ? AND site_id = ?')->execute([(int) $b['sort_order'], $id, $sid]);
         }
         Response::json(['ok' => true]);
     }
 
     public static function services(Request $req): void
     {
-        \Salon\Database\Migrator::ensureCategories();
         $pdo = Connection::get();
+        $sid = self::sid();
+        $cats = $pdo->prepare('SELECT * FROM service_categories WHERE site_id = ? ORDER BY sort_order');
+        $cats->execute([$sid]);
+        $svcs = $pdo->prepare('SELECT * FROM services WHERE site_id = ? ORDER BY name');
+        $svcs->execute([$sid]);
         Response::json([
-            'categories' => $pdo->query('SELECT * FROM service_categories ORDER BY sort_order')->fetchAll(),
-            'services' => $pdo->query('SELECT * FROM services ORDER BY name')->fetchAll(),
+            'categories' => $cats->fetchAll(),
+            'services' => $svcs->fetchAll(),
         ]);
     }
 
@@ -195,22 +215,23 @@ final class AdminController
     {
         $b = $req->body;
         $pdo = Connection::get();
+        $sid = self::sid();
         if (!empty($params['id'])) {
             $pdo->prepare(
-                'UPDATE services SET category_id=?, name=?, description=?, duration_minutes=?, price=?, price_type=?, is_active=? WHERE id=?'
+                'UPDATE services SET category_id=?, name=?, description=?, duration_minutes=?, price=?, price_type=?, deposit_percent=?, is_active=? WHERE id=? AND site_id=?'
             )->execute([
                 $b['category_id'] ?? null, $b['name'], $b['description'] ?? '',
                 (int) $b['duration_minutes'], (float) $b['price'], $b['price_type'] ?? 'fixed',
-                (int) ($b['is_active'] ?? 1), (int) $params['id'],
+                (int) ($b['deposit_percent'] ?? 0), (int) ($b['is_active'] ?? 1), (int) $params['id'], $sid,
             ]);
             Response::json(['id' => (int) $params['id']]);
         } else {
             $pdo->prepare(
-                'INSERT INTO services (category_id, name, description, duration_minutes, price, price_type, is_active) VALUES (?,?,?,?,?,?,?)'
+                'INSERT INTO services (site_id, category_id, name, description, duration_minutes, price, price_type, deposit_percent, is_active) VALUES (?,?,?,?,?,?,?,?,?)'
             )->execute([
-                $b['category_id'] ?? null, $b['name'], $b['description'] ?? '',
+                $sid, $b['category_id'] ?? null, $b['name'], $b['description'] ?? '',
                 (int) $b['duration_minutes'], (float) $b['price'], $b['price_type'] ?? 'fixed',
-                (int) ($b['is_active'] ?? 1),
+                (int) ($b['deposit_percent'] ?? 0), (int) ($b['is_active'] ?? 1),
             ]);
             Response::json(['id' => (int) $pdo->lastInsertId()], 201);
         }
@@ -218,7 +239,7 @@ final class AdminController
 
     public static function deleteService(Request $req, array $params): void
     {
-        Connection::get()->prepare('DELETE FROM services WHERE id = ?')->execute([(int) $params['id']]);
+        Connection::get()->prepare('DELETE FROM services WHERE id = ? AND site_id = ?')->execute([(int) $params['id'], self::sid()]);
         Response::json(['ok' => true]);
     }
 
@@ -226,31 +247,34 @@ final class AdminController
     {
         $b = $req->body;
         $pdo = Connection::get();
+        $sid = self::sid();
         if (!empty($params['id'])) {
-            $pdo->prepare('UPDATE service_categories SET name=?, sort_order=?, is_active=? WHERE id=?')
-                ->execute([$b['name'], (int) ($b['sort_order'] ?? 0), (int) ($b['is_active'] ?? 1), (int) $params['id']]);
+            $pdo->prepare('UPDATE service_categories SET name=?, sort_order=?, is_active=? WHERE id=? AND site_id=?')
+                ->execute([$b['name'], (int) ($b['sort_order'] ?? 0), (int) ($b['is_active'] ?? 1), (int) $params['id'], $sid]);
             Response::json(['id' => (int) $params['id']]);
         } else {
-            $pdo->prepare('INSERT INTO service_categories (name, sort_order, is_active) VALUES (?,?,?)')
-                ->execute([$b['name'], (int) ($b['sort_order'] ?? 0), (int) ($b['is_active'] ?? 1)]);
+            $pdo->prepare('INSERT INTO service_categories (site_id, name, sort_order, is_active) VALUES (?,?,?,?)')
+                ->execute([$sid, $b['name'], (int) ($b['sort_order'] ?? 0), (int) ($b['is_active'] ?? 1)]);
             Response::json(['id' => (int) $pdo->lastInsertId()], 201);
         }
     }
 
     public static function staffList(Request $req): void
     {
-        Migrator::ensureMediaTables();
         $pdo = Connection::get();
+        $sid = self::sid();
         if (($req->user['role'] ?? '') === 'staff') {
             $stmt = $pdo->prepare(
-                'SELECT s.*, u.email, u.phone FROM staff s LEFT JOIN users u ON u.id = s.user_id WHERE s.user_id = ?'
+                'SELECT s.*, u.email, u.phone FROM staff s LEFT JOIN users u ON u.id = s.user_id WHERE s.site_id = ? AND s.user_id = ?'
             );
-            $stmt->execute([(int) $req->user['id']]);
+            $stmt->execute([$sid, (int) $req->user['id']]);
             $staff = $stmt->fetchAll();
         } else {
-            $staff = $pdo->query(
-                'SELECT s.*, u.email, u.phone FROM staff s LEFT JOIN users u ON u.id = s.user_id'
-            )->fetchAll();
+            $stmt = $pdo->prepare(
+                'SELECT s.*, u.email, u.phone FROM staff s LEFT JOIN users u ON u.id = s.user_id WHERE s.site_id = ?'
+            );
+            $stmt->execute([$sid]);
+            $staff = $stmt->fetchAll();
         }
         foreach ($staff as &$s) {
             $stmt = $pdo->prepare('SELECT service_id FROM service_staff WHERE staff_id = ?');
@@ -269,6 +293,7 @@ final class AdminController
     {
         $b = $req->body;
         $pdo = Connection::get();
+        $sid = self::sid();
         $pdo->beginTransaction();
         try {
             if (!empty($params['id'])) {
@@ -279,12 +304,10 @@ final class AdminController
                     } catch (\RuntimeException $e) {
                         Response::error($e->getMessage(), 403);
                     }
-                    // پرسنل فقط حق ویرایش اطلاعات پروفایل خودش را دارد (نام/بیو/رنگ).
-                    // فیلدهای مدیریتی مثل خدمات، پذیرش نوبت و رضایت از این مسیر قابل تغییر نیستند.
                     unset($b['service_ids'], $b['satisfaction_percent']);
                 }
                 $pdo->prepare(
-                    'UPDATE staff SET display_name=?, bio=?, color_hex=?, is_accepting_bookings=?, satisfaction_percent=? WHERE id=?'
+                    'UPDATE staff SET display_name=?, bio=?, color_hex=?, is_accepting_bookings=?, satisfaction_percent=? WHERE id=? AND site_id=?'
                 )->execute([
                     $b['display_name'],
                     $b['bio'] ?? '',
@@ -292,17 +315,17 @@ final class AdminController
                     self::acceptingForSave($pdo, $req->user, $staffId, $b),
                     self::satisfactionForSave($pdo, $req->user, $staffId, $b),
                     $staffId,
+                    $sid,
                 ]);
             } else {
                 $userId = null;
                 if (!empty($b['email']) && !empty($b['password'])) {
-                    $userId = AuthService::createAdmin($b['display_name'], $b['email'], $b['password'], 'staff');
-                    $pdo->prepare('UPDATE users SET role = "staff" WHERE id = ?')->execute([$userId]);
+                    $userId = AuthService::createAdmin($b['display_name'], $b['email'], $b['password'], 'staff', $sid);
                 }
                 $pdo->prepare(
-                    'INSERT INTO staff (user_id, display_name, bio, color_hex, is_accepting_bookings, satisfaction_percent) VALUES (?,?,?,?,?,?)'
+                    'INSERT INTO staff (site_id, user_id, display_name, bio, color_hex, is_accepting_bookings, satisfaction_percent) VALUES (?,?,?,?,?,?,?)'
                 )->execute([
-                    $userId, $b['display_name'], $b['bio'] ?? '', $b['color_hex'] ?? '#be185d',
+                    $sid, $userId, $b['display_name'], $b['bio'] ?? '', $b['color_hex'] ?? '#be185d',
                     (int) ($b['is_accepting_bookings'] ?? 1),
                     (int) ($b['satisfaction_percent'] ?? 98),
                 ]);
@@ -311,8 +334,8 @@ final class AdminController
             if (isset($b['service_ids']) && is_array($b['service_ids'])) {
                 $pdo->prepare('DELETE FROM service_staff WHERE staff_id = ?')->execute([$staffId]);
                 $ins = $pdo->prepare('INSERT INTO service_staff (service_id, staff_id) VALUES (?, ?)');
-                foreach ($b['service_ids'] as $sid) {
-                    $ins->execute([(int) $sid, $staffId]);
+                foreach ($b['service_ids'] as $sidv) {
+                    $ins->execute([(int) $sidv, $staffId]);
                 }
             }
             $pdo->commit();
@@ -325,11 +348,12 @@ final class AdminController
 
     public static function customers(Request $req): void
     {
-        $rows = Connection::get()->query(
+        $stmt = Connection::get()->prepare(
             'SELECT u.id, u.name, u.phone, u.email, u.created_at, c.notes FROM users u
-             LEFT JOIN customers c ON c.user_id = u.id WHERE u.role = "customer" ORDER BY u.created_at DESC LIMIT 500'
-        )->fetchAll();
-        Response::json($rows);
+             LEFT JOIN customers c ON c.user_id = u.id WHERE u.site_id = ? AND u.role = "customer" ORDER BY u.created_at DESC LIMIT 500'
+        );
+        $stmt->execute([self::sid()]);
+        Response::json($stmt->fetchAll());
     }
 
     public static function notifications(Request $req): void
@@ -378,10 +402,11 @@ final class AdminController
 
     public static function galleryList(Request $req): void
     {
-        Migrator::ensureMediaTables();
-        $rows = Connection::get()->query(
-            'SELECT * FROM gallery_images ORDER BY sort_order, id DESC'
-        )->fetchAll();
+        $stmt = Connection::get()->prepare(
+            'SELECT * FROM gallery_images WHERE site_id = ? ORDER BY sort_order, id DESC'
+        );
+        $stmt->execute([self::sid()]);
+        $rows = $stmt->fetchAll();
         foreach ($rows as &$r) {
             $r['url'] = UploadService::publicUrl($r['file_path']);
         }
@@ -390,17 +415,18 @@ final class AdminController
 
     public static function uploadGallery(Request $req): void
     {
-        Migrator::ensureMediaTables();
         if (empty($_FILES['image'])) {
             Response::error('فایل تصویر ارسال نشده');
         }
         try {
-            $path = UploadService::saveUploadedImage($_FILES['image'], 'gallery');
+            $sid = self::sid();
+            $path = UploadService::saveUploadedImage($_FILES['image'], $sid . '/gallery');
             $caption = trim((string) ($_POST['caption'] ?? ''));
             $pdo = Connection::get();
-            $max = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM gallery_images')->fetchColumn();
-            $pdo->prepare('INSERT INTO gallery_images (file_path, caption, sort_order) VALUES (?,?,?)')
-                ->execute([$path, $caption, $max + 1]);
+            $max = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM gallery_images WHERE site_id = ?');
+            $max->execute([$sid]);
+            $pdo->prepare('INSERT INTO gallery_images (site_id, file_path, caption, sort_order) VALUES (?,?,?,?)')
+                ->execute([$sid, $path, $caption, (int) $max->fetchColumn() + 1]);
             Response::json([
                 'id' => (int) $pdo->lastInsertId(),
                 'file_path' => $path,
@@ -414,17 +440,16 @@ final class AdminController
 
     public static function deleteGallery(Request $req, array $params): void
     {
-        Migrator::ensureMediaTables();
         $pdo = Connection::get();
         $id = (int) $params['id'];
-        $stmt = $pdo->prepare('SELECT file_path FROM gallery_images WHERE id = ?');
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare('SELECT file_path FROM gallery_images WHERE id = ? AND site_id = ?');
+        $stmt->execute([$id, self::sid()]);
         $row = $stmt->fetch();
         if (!$row) {
             Response::error('تصویر یافت نشد', 404);
         }
         UploadService::deleteByPath($row['file_path']);
-        $pdo->prepare('DELETE FROM gallery_images WHERE id = ?')->execute([$id]);
+        $pdo->prepare('DELETE FROM gallery_images WHERE id = ? AND site_id = ?')->execute([$id, self::sid()]);
         Response::json(['ok' => true]);
     }
 
@@ -434,13 +459,15 @@ final class AdminController
             Response::error('فایل تصویر ارسال نشده');
         }
         try {
-            Migrator::ensureSalonSettingsColumns();
-            $path = UploadService::saveUploadedImage($_FILES['image'], 'hero');
+            $sid = self::sid();
+            $path = UploadService::saveUploadedImage($_FILES['image'], $sid . '/hero');
             $pdo = Connection::get();
-            $old = $pdo->query('SELECT hero_image FROM salon_settings WHERE id = 1')->fetchColumn();
+            $q = $pdo->prepare('SELECT hero_image FROM salon_settings WHERE site_id = ?');
+            $q->execute([$sid]);
+            $old = $q->fetchColumn();
             UploadService::deleteByPath(is_string($old) ? $old : null);
-            $pdo->prepare('UPDATE salon_settings SET hero_image = ?, updated_at = datetime("now") WHERE id = 1')
-                ->execute([$path]);
+            $pdo->prepare('UPDATE salon_settings SET hero_image = ?, updated_at = NOW() WHERE site_id = ?')
+                ->execute([$path, $sid]);
             Response::json(['hero_image' => $path, 'url' => UploadService::publicUrl($path)]);
         } catch (\Throwable $e) {
             Response::error($e->getMessage());
@@ -453,13 +480,15 @@ final class AdminController
             Response::error('فایل تصویر ارسال نشده');
         }
         try {
-            Migrator::ensureSalonSettingsColumns();
-            $path = UploadService::saveUploadedImage($_FILES['image'], 'logo');
+            $sid = self::sid();
+            $path = UploadService::saveUploadedImage($_FILES['image'], $sid . '/logo');
             $pdo = Connection::get();
-            $old = $pdo->query('SELECT logo_path FROM salon_settings WHERE id = 1')->fetchColumn();
+            $q = $pdo->prepare('SELECT logo_path FROM salon_settings WHERE site_id = ?');
+            $q->execute([$sid]);
+            $old = $q->fetchColumn();
             UploadService::deleteByPath(is_string($old) ? $old : null);
-            $pdo->prepare('UPDATE salon_settings SET logo_path = ?, updated_at = datetime("now") WHERE id = 1')
-                ->execute([$path]);
+            $pdo->prepare('UPDATE salon_settings SET logo_path = ?, updated_at = NOW() WHERE site_id = ?')
+                ->execute([$path, $sid]);
             Response::json(['logo_path' => $path, 'url' => UploadService::publicUrl($path)]);
         } catch (\Throwable $e) {
             Response::error($e->getMessage());
@@ -468,7 +497,6 @@ final class AdminController
 
     public static function uploadStaffAvatar(Request $req, array $params): void
     {
-        Migrator::ensureMediaTables();
         $staffId = (int) $params['id'];
         try {
             StaffProfileService::assertCanManageStaff($req->user, $staffId);
@@ -479,13 +507,14 @@ final class AdminController
             Response::error('فایل تصویر ارسال نشده');
         }
         try {
-            $path = UploadService::saveUploadedImage($_FILES['image'], 'avatars');
+            $sid = self::sid();
+            $path = UploadService::saveUploadedImage($_FILES['image'], $sid . '/avatars');
             $pdo = Connection::get();
-            $stmt = $pdo->prepare('SELECT avatar_path FROM staff WHERE id = ?');
-            $stmt->execute([$staffId]);
+            $stmt = $pdo->prepare('SELECT avatar_path FROM staff WHERE id = ? AND site_id = ?');
+            $stmt->execute([$staffId, $sid]);
             $old = $stmt->fetchColumn();
             UploadService::deleteByPath(is_string($old) ? $old : null);
-            $pdo->prepare('UPDATE staff SET avatar_path = ? WHERE id = ?')->execute([$path, $staffId]);
+            $pdo->prepare('UPDATE staff SET avatar_path = ? WHERE id = ? AND site_id = ?')->execute([$path, $staffId, $sid]);
             Response::json(['avatar_path' => $path, 'url' => UploadService::publicUrl($path)]);
         } catch (\Throwable $e) {
             Response::error($e->getMessage());
@@ -494,7 +523,6 @@ final class AdminController
 
     public static function staffPortfolio(Request $req, array $params): void
     {
-        Migrator::ensureMediaTables();
         $staffId = (int) $params['id'];
         try {
             StaffProfileService::assertCanManageStaff($req->user, $staffId);
@@ -502,9 +530,9 @@ final class AdminController
             Response::error($e->getMessage(), 403);
         }
         $stmt = Connection::get()->prepare(
-            'SELECT * FROM staff_portfolio WHERE staff_id = ? ORDER BY sort_order, id'
+            'SELECT * FROM staff_portfolio WHERE staff_id = ? AND site_id = ? ORDER BY sort_order, id'
         );
-        $stmt->execute([$staffId]);
+        $stmt->execute([$staffId, self::sid()]);
         $rows = $stmt->fetchAll();
         foreach ($rows as &$r) {
             $r['url'] = UploadService::publicUrl($r['file_path']);
@@ -514,7 +542,6 @@ final class AdminController
 
     public static function uploadStaffPortfolio(Request $req, array $params): void
     {
-        Migrator::ensureMediaTables();
         $staffId = (int) $params['id'];
         try {
             StaffProfileService::assertCanManageStaff($req->user, $staffId);
@@ -525,14 +552,15 @@ final class AdminController
             Response::error('فایل تصویر ارسال نشده');
         }
         try {
-            $path = UploadService::saveUploadedImage($_FILES['image'], 'portfolio/' . $staffId);
+            $sid = self::sid();
+            $path = UploadService::saveUploadedImage($_FILES['image'], $sid . '/portfolio/' . $staffId);
             $caption = trim((string) ($_POST['caption'] ?? ''));
             $pdo = Connection::get();
             $max = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM staff_portfolio WHERE staff_id = ?');
             $max->execute([$staffId]);
             $order = (int) $max->fetchColumn() + 1;
-            $pdo->prepare('INSERT INTO staff_portfolio (staff_id, file_path, caption, sort_order) VALUES (?,?,?,?)')
-                ->execute([$staffId, $path, $caption, $order]);
+            $pdo->prepare('INSERT INTO staff_portfolio (site_id, staff_id, file_path, caption, sort_order) VALUES (?,?,?,?,?)')
+                ->execute([$sid, $staffId, $path, $caption, $order]);
             Response::json([
                 'id' => (int) $pdo->lastInsertId(),
                 'file_path' => $path,
@@ -546,7 +574,6 @@ final class AdminController
 
     public static function updateStaffPortfolio(Request $req, array $params): void
     {
-        Migrator::ensureMediaTables();
         $staffId = (int) $params['id'];
         $itemId = (int) $params['itemId'];
         try {
@@ -557,8 +584,8 @@ final class AdminController
 
         $caption = trim((string) ($req->body['caption'] ?? ''));
         $pdo = Connection::get();
-        $stmt = $pdo->prepare('UPDATE staff_portfolio SET caption = ? WHERE id = ? AND staff_id = ?');
-        $stmt->execute([$caption, $itemId, $staffId]);
+        $stmt = $pdo->prepare('UPDATE staff_portfolio SET caption = ? WHERE id = ? AND staff_id = ? AND site_id = ?');
+        $stmt->execute([$caption, $itemId, $staffId, self::sid()]);
         if ($stmt->rowCount() === 0) {
             Response::error('نمونه کار یافت نشد', 404);
         }
@@ -567,7 +594,6 @@ final class AdminController
 
     public static function deleteStaffPortfolio(Request $req, array $params): void
     {
-        Migrator::ensureMediaTables();
         $staffId = (int) $params['id'];
         $itemId = (int) $params['itemId'];
         try {
@@ -576,8 +602,8 @@ final class AdminController
             Response::error($e->getMessage(), 403);
         }
         $pdo = Connection::get();
-        $stmt = $pdo->prepare('SELECT file_path FROM staff_portfolio WHERE id = ? AND staff_id = ?');
-        $stmt->execute([$itemId, $staffId]);
+        $stmt = $pdo->prepare('SELECT file_path FROM staff_portfolio WHERE id = ? AND staff_id = ? AND site_id = ?');
+        $stmt->execute([$itemId, $staffId, self::sid()]);
         $row = $stmt->fetch();
         if (!$row) {
             Response::error('نمونه کار یافت نشد', 404);
