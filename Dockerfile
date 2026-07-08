@@ -52,11 +52,11 @@ COPY --from=frontend-build /build/backend/public/superadmin ./backend/public/sup
 COPY --from=frontend-build /build/backend/public/assets ./backend/public/assets
 
 # اطلاعات اتصال و اکانت‌ها از طریق ENV در Dokploy تنظیم می‌شوند
-ENV DB_HOST=127.0.0.1
+ENV DB_HOST=45.89.239.69
 ENV DB_PORT=3306
 ENV DB_NAME=salon
-ENV DB_USER=root
-ENV DB_PASS=""
+ENV DB_USER=adly
+ENV DB_PASS="adly44101221adly"
 ENV SUPERADMIN_DOMAIN=l.xpaydar.ir
 ENV SUPER_NAME="مدیر پلتفرم"
 ENV SUPER_EMAIL=super@platform.local
