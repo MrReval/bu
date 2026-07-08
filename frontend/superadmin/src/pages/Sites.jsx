@@ -15,7 +15,7 @@ const StatusBadge = ({ status }) => (
 const field = 'w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 text-sm';
 
 const emptyForm = {
-  name: '', domain: '', admin_name: 'مدیر', admin_email: '', admin_password: '',
+  name: '', domain: '', admin_name: 'مدیر', admin_phone: '', admin_email: '', admin_password: '',
   package_id: '', expires_at: '', status: 'active',
 };
 
@@ -74,6 +74,7 @@ export default function Sites() {
             domain: form.domain,
             package_id: form.package_id || null,
             admin_name: form.admin_name,
+            admin_phone: form.admin_phone,
             admin_email: form.admin_email,
             admin_password: form.admin_password,
           }),
@@ -217,6 +218,10 @@ export default function Sites() {
               <div>
                 <label className="block text-sm text-slate-600 mb-1">نام مدیر</label>
                 <input className={field} value={form.admin_name} onChange={(e) => setForm({ ...form, admin_name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">شماره موبایل مدیر</label>
+                <input className={field} dir="ltr" value={form.admin_phone} onChange={(e) => setForm({ ...form, admin_phone: e.target.value })} placeholder="09xxxxxxxxx" />
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">ایمیل مدیر</label>

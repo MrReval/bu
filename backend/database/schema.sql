@@ -382,6 +382,20 @@ CREATE TABLE IF NOT EXISTS sms_logs (
     KEY idx_smslogs_site (site_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS system_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    level VARCHAR(20) NOT NULL DEFAULT 'error',
+    channel VARCHAR(50) NOT NULL DEFAULT 'app',
+    site_id INT NULL,
+    message TEXT NOT NULL,
+    context TEXT,
+    ip VARCHAR(64) NULL,
+    path VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_syslog_level (level),
+    KEY idx_syslog_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS survey_responses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     site_id INT NOT NULL,

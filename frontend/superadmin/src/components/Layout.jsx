@@ -5,6 +5,7 @@ import {
   Globe,
   Package,
   MessageSquare,
+  Activity,
   LogOut,
   ShieldCheck,
   Menu,
@@ -17,12 +18,14 @@ const nav = [
   { to: '/sites', label: 'وب‌سایت‌ها', icon: Globe },
   { to: '/packages', label: 'پکیج‌ها', icon: Package },
   { to: '/sms', label: 'پیامک', icon: MessageSquare },
+  { to: '/monitoring', label: 'مانیتورینگ', icon: Activity },
 ];
 
 const titleFor = (path) => {
   if (path.startsWith('/sites')) return 'وب‌سایت‌ها';
   if (path.startsWith('/packages')) return 'پکیج‌ها';
   if (path.startsWith('/sms')) return 'پیامک';
+  if (path.startsWith('/monitoring')) return 'مانیتورینگ';
   return 'داشبورد';
 };
 

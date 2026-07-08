@@ -61,7 +61,16 @@ if ($mode === 'platform') {
         $request = Request::fromGlobals();
         $router = new Router();
         (require dirname(__DIR__) . '/src/super_routes.php')($router);
-        $router->dispatch($request);
+        try {
+            $router->dispatch($request);
+        } catch (\Throwable $e) {
+            Salon\Services\Logger::exception($e, 'super');
+            if (!headers_sent()) {
+                http_response_code(500);
+                header('Content-Type: application/json; charset=utf-8');
+            }
+            echo json_encode(['error' => 'خطای داخلی سرور'], JSON_UNESCAPED_UNICODE);
+        }
         exit;
     }
     $spa = __DIR__ . '/superadmin/index.html';
@@ -200,7 +209,24 @@ if (str_starts_with($path, '/api')) {
     $request = Request::fromGlobals();
     $router = new Router();
     (require dirname(__DIR__) . '/src/routes.php')($router);
-    $router->dispatch($request);
+    try {
+        $router->dispatch($request);
+    } catch (\Throwable $e) {
+        $sid = null;
+        try {
+            $sid = Salon\Tenant\TenantContext::siteIdOrNull();
+        } catch (\Throwable $ignored) {
+        }
+        Salon\Services\Logger::error($e->getMessage(), [
+            'type' => get_class($e),
+            'file' => $e->getFile() . ':' . $e->getLine(),
+        ], $sid, 'site');
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode(['error' => 'خطای داخلی سرور'], JSON_UNESCAPED_UNICODE);
+    }
     exit;
 }
 

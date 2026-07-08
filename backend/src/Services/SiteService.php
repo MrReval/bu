@@ -56,7 +56,7 @@ final class SiteService
             $pdo->prepare('UPDATE salon_settings SET name = ? WHERE site_id = ?')->execute([$name, $siteId]);
 
             // کاربر مدیر سالن
-            $adminId = AuthService::createAdmin($adminName, $adminEmail, $adminPassword, 'super_admin', $siteId);
+            $adminId = AuthService::createAdmin($adminName, $adminEmail, $adminPassword, 'super_admin', $siteId, $data['admin_phone'] ?? null);
 
             // پرسنل پیش‌فرض به نام مدیر
             $pdo->prepare('INSERT INTO staff (site_id, user_id, display_name, color_hex) VALUES (?, ?, ?, ?)')

@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Sites from './pages/Sites';
 import Packages from './pages/Packages';
 import Sms from './pages/Sms';
+import Monitoring from './pages/Monitoring';
 
 function RequireAuth({ children }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/sites" element={<Sites />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/sms" element={<Sms />} />
+        <Route path="/monitoring" element={<Monitoring />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

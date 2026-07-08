@@ -73,12 +73,12 @@ final class AuthService
         return ['token' => $token, 'expires_at' => $expires, 'user' => $user];
     }
 
-    public static function createAdmin(string $name, string $email, string $password, string $role = 'super_admin', ?int $siteId = null): int
+    public static function createAdmin(string $name, string $email, string $password, string $role = 'super_admin', ?int $siteId = null, ?string $phone = null): int
     {
         $pdo = Connection::get();
         $siteId = $siteId ?? TenantContext::siteId();
         $hash = password_hash($password, PASSWORD_DEFAULT);
-        $phone = '09' . random_int(100000000, 999999999);
+        $phone = ($phone !== null && trim($phone) !== '') ? trim($phone) : '09' . random_int(100000000, 999999999);
         $stmt = $pdo->prepare(
             'INSERT INTO users (site_id, name, phone, email, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)'
         );
