@@ -10,6 +10,14 @@ import {
 } from 'lucide-react';
 import { api, mediaUrl } from '../../../shared/api';
 
+// نمونه‌کارهای پیش‌فرض (وقتی پرسنل هنوز نمونه‌کاری ثبت نکرده)
+const DEFAULT_PORTFOLIO = [
+  { id: -1, url: '/defaults/portfolio-1.jpg', caption: '' },
+  { id: -2, url: '/defaults/portfolio-2.jpg', caption: '' },
+  { id: -3, url: '/defaults/gallery-1.jpg', caption: '' },
+  { id: -4, url: '/defaults/gallery-3.jpg', caption: '' },
+];
+
 export default function StaffProfile({ settings }) {
   const { id } = useParams();
   const [profile, setProfile] = useState(null);
@@ -46,7 +54,8 @@ export default function StaffProfile({ settings }) {
   }
 
   const avatarSrc = profile.avatar_url || mediaUrl(profile.avatar_path);
-  const activeItem = (profile?.portfolio || []).find((x) => x.id === activeId) || null;
+  const portfolio = profile.portfolio?.length ? profile.portfolio : DEFAULT_PORTFOLIO;
+  const activeItem = portfolio.find((x) => x.id === activeId) || null;
 
   return (
     <div className="pb-20">
@@ -121,14 +130,14 @@ export default function StaffProfile({ settings }) {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 mt-14 space-y-14">
-        {profile.portfolio?.length > 0 && (
+        {portfolio.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-6">
               <ImageIcon className="w-6 h-6" style={{ color: primary }} />
               <h2 className="text-2xl font-bold text-stone-900">نمونه کارها</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {profile.portfolio.map((item) => (
+              {portfolio.map((item) => (
                 <button
                   key={item.id}
                   type="button"

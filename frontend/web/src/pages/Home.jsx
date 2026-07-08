@@ -31,6 +31,18 @@ const FEATURES = [
   { icon: Gem, title: 'محیط لوکس', desc: 'فضایی آرام و بهداشتی برای آرامش شما' },
 ];
 
+// عکس‌های پیش‌فرض دمو (هیرو و گالری) که همیشه در دسترس‌اند
+const DEFAULT_HERO = '/defaults/hero.jpg';
+const DEFAULT_ABOUT = '/defaults/gallery-2.jpg';
+const DEFAULT_GALLERY = [
+  '/defaults/gallery-1.jpg',
+  '/defaults/gallery-2.jpg',
+  '/defaults/gallery-3.jpg',
+  '/defaults/gallery-4.jpg',
+  '/defaults/gallery-5.jpg',
+  '/defaults/gallery-6.jpg',
+];
+
 function CategoryIcon({ name, className = 'w-6 h-6' }) {
   const Icon = getCategoryIconComponent(name);
   return <Icon className={className} strokeWidth={2} />;
@@ -67,11 +79,9 @@ export default function Home({ settings }) {
     return active.filter((s) => String(s.category_id) === String(activeCat));
   }, [services, activeCat]);
 
-  const galleryImages = gallery.length > 0 ? gallery.map((g) => g.url) : [];
+  const galleryImages = gallery.length > 0 ? gallery.map((g) => g.url) : DEFAULT_GALLERY;
 
-  const heroImage =
-    mediaUrl(settings.hero_image) ||
-    'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=85';
+  const heroImage = mediaUrl(settings.hero_image) || DEFAULT_HERO;
 
   const testimonials = sectionConfig('testimonials').items?.length
     ? sectionConfig('testimonials').items
@@ -89,10 +99,7 @@ export default function Home({ settings }) {
         <div className="absolute inset-0 lg:hidden bg-gradient-to-b from-black/45 via-black/35 to-black/55" />
         <div
           className="absolute inset-0 bg-cover bg-center opacity-15 hidden lg:block"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1920&q=80')",
-          }}
+          style={{ backgroundImage: `url('${heroImage}')` }}
         />
         <div
           className="absolute -top-24 -right-24 w-72 h-72 rounded-full blur-3xl opacity-25 hidden lg:block"
@@ -304,7 +311,7 @@ export default function Home({ settings }) {
         <div className="max-w-7xl mx-auto px-4 grid lg:grid-cols-2 gap-16 items-center">
           <div className="relative order-2 lg:order-1">
             <img
-              src="https://up.20script.ir/file/19a0-d7288fb0e26e335b716071de43c3bf61.jpg"
+              src={mediaUrl(settings.hero_image) || DEFAULT_ABOUT}
               alt=""
               className="rounded-3xl shadow-xl w-full aspect-square object-cover"
             />
