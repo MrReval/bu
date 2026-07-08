@@ -18,7 +18,7 @@ export default function Layout({ settings, children }) {
   ];
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       <header className="fixed top-0 inset-x-0 z-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="mt-4 flex items-center justify-between rounded-2xl bg-white/90 backdrop-blur-xl border border-stone-200/80 shadow-sm px-5 py-3">
@@ -120,9 +120,9 @@ export default function Layout({ settings, children }) {
         )}
       </header>
 
-      <main className="pt-24">{children}</main>
+      <main className="pt-24 flex-1">{children}</main>
 
-      <footer id="contact" className="text-white" style={{ backgroundColor: secondary }}>
+      <footer id="contact" className="text-white mt-auto" style={{ backgroundColor: secondary }}>
         <div className="max-w-7xl mx-auto px-4 py-16 grid md:grid-cols-3 gap-10">
           <div>
             {logoUrl ? (

@@ -48,6 +48,7 @@ return function (Router $router): void {
     $router->patch('/api/v1/admin/appointments/{id}/status', [AdminController::class, 'updateAppointmentStatus'], $staffAdmin);
     $router->post('/api/v1/admin/appointments', [AdminController::class, 'createAppointment'], $admin);
 
+    $router->get('/api/v1/admin/subscription', [AdminController::class, 'subscription'], $admin);
     $router->get('/api/v1/admin/settings', [AdminController::class, 'getSettings'], $admin);
     $router->patch('/api/v1/admin/settings', [AdminController::class, 'updateSettings'], $admin);
     $router->get('/api/v1/admin/landing/sections', [AdminController::class, 'landingSections'], $admin);

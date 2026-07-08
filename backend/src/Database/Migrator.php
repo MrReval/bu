@@ -308,6 +308,30 @@ final class Migrator
                 }
             }
         }
+
+        // عکس پیش‌فرض برای خدمات (از مجموعه‌ی دموی موجود)
+        $pool = array_merge(
+            self::imageFiles($base . '/gallery'),
+            self::imageFiles($base . '/portfolio/2'),
+            self::imageFiles($base . '/hero')
+        );
+        if ($pool) {
+            $svcStmt = $pdo->prepare("SELECT id FROM services WHERE site_id = ? AND (image_path IS NULL OR image_path = '') ORDER BY id");
+            $svcStmt->execute([$siteId]);
+            $serviceIds = $svcStmt->fetchAll(\PDO::FETCH_COLUMN);
+            if ($serviceIds) {
+                $upd = $pdo->prepare('UPDATE services SET image_path = ? WHERE id = ?');
+                $i = 0;
+                foreach ($serviceIds as $svcId) {
+                    $src = $pool[$i % count($pool)];
+                    $dest = self::copyDemoFile($src, $siteId, 'services');
+                    if ($dest) {
+                        $upd->execute([$dest, (int) $svcId]);
+                    }
+                    $i++;
+                }
+            }
+        }
     }
 
     /** عکس آواتار و نمونه‌کار پیش‌فرض برای پرسنل تازه‌ساخته‌شده */

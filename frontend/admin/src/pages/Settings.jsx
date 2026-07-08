@@ -4,13 +4,7 @@ import {
   Palette,
   Clock,
   CalendarCheck,
-  DownloadCloud,
-  Terminal,
-  Info,
-  RefreshCcw,
-  Play,
-  Loader2,
-  FileText as FileIcon,
+  Gem,
   Building2,
   Phone,
   MapPin,
@@ -19,8 +13,13 @@ import {
   Image,
   Save,
   CheckCircle2,
+  Check,
+  Lock,
+  CalendarClock,
+  BadgeCheck,
 } from 'lucide-react';
-import { api, mediaUrl } from '../../../shared/api';
+import { api, mediaUrl, formatPrice } from '../../../shared/api';
+import { formatJalaliDate } from '../../../shared/jalali';
 import ImageUpload from '../components/ImageUpload';
 import { DAY_NAMES, normalizeBusinessHours, parseJson } from '../../../shared/utils';
 import { useToast } from '../context/Toast';
@@ -38,9 +37,7 @@ export default function Settings() {
   const [tab, setTab] = useState('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sys, setSys] = useState(null);
-  const [upd, setUpd] = useState(null);
-  const [updLoading, setUpdLoading] = useState(false);
+  const [sub, setSub] = useState(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -59,23 +56,12 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    if (tab !== 'update') return;
-    api('/admin/system/info')
-      .then(setSys)
-      .catch(() => {});
-    api('/admin/system/update/status')
-      .then(setUpd)
-      .catch(() => {});
+    if (tab !== 'subscription' || sub) return;
+    api('/admin/subscription')
+      .then(setSub)
+      .catch((e) => toast.show(e.message, 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
-
-  useEffect(() => {
-    if (tab !== 'update') return;
-    if (!upd?.running) return;
-    const t = setInterval(() => {
-      api('/admin/system/update/status').then(setUpd).catch(() => {});
-    }, 4000);
-    return () => clearInterval(t);
-  }, [tab, upd?.running]);
 
   const save = async (e) => {
     e.preventDefault();
@@ -139,7 +125,7 @@ export default function Settings() {
     { id: 'theme', label: 'ظاهر سایت', icon: Palette },
     { id: 'hours', label: 'ساعات کاری', icon: Clock },
     { id: 'booking', label: 'رزرو', icon: CalendarCheck },
-    { id: 'update', label: 'بروزرسانی', icon: DownloadCloud },
+    { id: 'subscription', label: 'اشتراک', icon: Gem },
   ];
 
   const inputClass =
@@ -475,126 +461,133 @@ export default function Settings() {
           </div>
         )}
 
-        {tab === 'update' && (
-          <div className={cardClass}>
-            <div className="flex items-center gap-2 text-slate-800 font-semibold mb-5">
-              <DownloadCloud className="w-5 h-5 text-pink-600" />
-              بروزرسانی سیستم
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500 mb-1 flex items-center gap-1">
-                  <Info className="w-4 h-4" />
-                  نسخه فعلی
-                </p>
-                <p className="text-2xl font-bold text-slate-900" dir="ltr">
-                  {sys?.version || '—'}
-                </p>
-                <p className="text-xs text-slate-400 mt-2" dir="ltr">
-                  PHP: {sys?.php || '—'}
-                </p>
-                {sys?.installed_at && (
-                  <p className="text-xs text-slate-400 mt-1">نصب شده در: {sys.installed_at}</p>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-900 mb-2">بروزرسانی با یک کلیک</p>
-                <p className="text-xs text-slate-500 mb-4">
-                  با دکمه زیر، سیستم به‌صورت خودکار آپدیت را اجرا می‌کند (git pull + نصب وابستگی‌ها + build).
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={upd?.running || updLoading}
-                    onClick={async () => {
-                      setUpdLoading(true);
-                      try {
-                        const r = await api('/admin/system/update/start', { method: 'POST' });
-                        setUpd(r);
-                        toast.show('بروزرسانی شروع شد');
-                      } catch (e) {
-                        toast.show(e.message, 'error');
-                      } finally {
-                        setUpdLoading(false);
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-pink-600 hover:bg-pink-700 disabled:opacity-60 text-white shadow-sm"
-                  >
-                    {upd?.running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                    {upd?.running ? 'در حال بروزرسانی...' : 'شروع بروزرسانی'}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={updLoading}
-                    onClick={async () => {
-                      setUpdLoading(true);
-                      try {
-                        const r = await api('/admin/system/update/status');
-                        setUpd(r);
-                      } finally {
-                        setUpdLoading(false);
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 hover:bg-slate-50"
-                  >
-                    <RefreshCcw className="w-4 h-4" />
-                    بروزرسانی وضعیت
-                  </button>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-800">وضعیت</p>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-md ${
-                        upd?.running
-                          ? 'bg-amber-100 text-amber-800'
-                          : upd?.exit_code === 0
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : upd?.exit_code != null
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {upd?.running
-                        ? 'در حال اجرا'
-                        : upd?.exit_code === 0
-                          ? 'موفق'
-                          : upd?.exit_code != null
-                            ? 'ناموفق'
-                            : 'آماده'}
-                    </span>
-                  </div>
-                  {(upd?.started_at || upd?.finished_at) && (
-                    <div className="mt-2 text-xs text-slate-500 space-y-1">
-                      {upd?.started_at && <div>شروع: {upd.started_at}</div>}
-                      {upd?.finished_at && <div>پایان: {upd.finished_at}</div>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2 text-slate-800 font-semibold mb-3">
-                <Terminal className="w-4 h-4 text-slate-500" />
-                لاگ بروزرسانی
-              </div>
-              <pre className="text-xs leading-relaxed bg-slate-50 border border-slate-200 rounded-xl p-3 overflow-auto max-h-64 whitespace-pre-wrap">
-                {upd?.log_tail || '—'}
-              </pre>
-              <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
-                <FileIcon className="w-4 h-4" />
-                فقط آخرین بخش لاگ نمایش داده می‌شود.
-              </p>
-            </div>
-          </div>
+        {tab === 'subscription' && (
+          <SubscriptionTab sub={sub} />
         )}
       </form>
+    </div>
+  );
+}
+
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.ceil((d - new Date()) / 86400000);
+}
+
+function SubscriptionTab({ sub }) {
+  if (!sub) {
+    return (
+      <div className="flex items-center justify-center h-40 text-slate-400">در حال بارگذاری اشتراک...</div>
+    );
+  }
+
+  const left = daysLeft(sub.expires_at);
+  const expired = left !== null && left < 0;
+  const soon = left !== null && left >= 0 && left <= 7;
+  const enabled = (sub.features || []).filter((f) => f.enabled);
+  const disabled = (sub.features || []).filter((f) => !f.enabled);
+
+  return (
+    <div className="space-y-6">
+      {/* کارت پلن */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-pink-600 via-pink-500 to-fuchsia-600 text-white p-6 shadow-lg">
+        <Gem className="absolute -left-6 -bottom-6 w-40 h-40 opacity-10" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-white/70 text-sm mb-1">پلن اشتراک فعلی</p>
+            <h2 className="text-3xl font-extrabold">{sub.package?.name || 'بدون پلن'}</h2>
+            {sub.package?.description && (
+              <p className="text-white/80 text-sm mt-1 max-w-md">{sub.package.description}</p>
+            )}
+          </div>
+          <span
+            className={`px-3 py-1.5 rounded-xl text-sm font-bold ${
+              expired ? 'bg-white/20' : 'bg-white text-pink-700'
+            }`}
+          >
+            {expired ? 'منقضی شده' : sub.status === 'active' ? 'فعال' : 'غیرفعال'}
+          </span>
+        </div>
+
+        <div className="relative grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
+          {sub.package && (
+            <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
+              <p className="text-white/70 text-xs mb-0.5">هزینه ماهانه</p>
+              <p className="font-extrabold">{formatPrice(sub.package.price_monthly)} <span className="text-xs font-normal">تومان</span></p>
+            </div>
+          )}
+          {sub.package && (
+            <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
+              <p className="text-white/70 text-xs mb-0.5">هزینه سالانه</p>
+              <p className="font-extrabold">{formatPrice(sub.package.price_yearly)} <span className="text-xs font-normal">تومان</span></p>
+            </div>
+          )}
+          <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
+            <p className="text-white/70 text-xs mb-0.5 flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> تاریخ انقضا</p>
+            <p className="font-extrabold">{formatJalaliDate(sub.expires_at)}</p>
+          </div>
+        </div>
+
+        {left !== null && (
+          <div className="relative mt-4">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold ${
+                expired ? 'bg-rose-900/40 text-rose-50' : soon ? 'bg-amber-900/30 text-amber-50' : 'bg-white/20'
+              }`}
+            >
+              {expired
+                ? 'اشتراک شما به پایان رسیده است'
+                : `${new Intl.NumberFormat('fa-IR').format(left)} روز تا پایان اشتراک`}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* شمارنده امکانات */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold">
+            <BadgeCheck className="w-5 h-5 text-pink-600" />
+            امکانات پلن شما
+          </div>
+          <span className="text-sm text-slate-500">
+            {new Intl.NumberFormat('fa-IR').format(sub.enabled_count)} از {new Intl.NumberFormat('fa-IR').format(sub.total_count)} قابلیت فعال
+          </span>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-2.5">
+          {enabled.map((f) => (
+            <div key={f.key} className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
+              <span className="mt-0.5 w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                <Check className="w-4 h-4" strokeWidth={3} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800">{f.name}</p>
+                {f.description && <p className="text-xs text-slate-500 truncate">{f.description}</p>}
+              </div>
+            </div>
+          ))}
+          {disabled.map((f) => (
+            <div key={f.key} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 opacity-70">
+              <span className="mt-0.5 w-6 h-6 rounded-lg bg-slate-300 text-white flex items-center justify-center shrink-0">
+                <Lock className="w-3.5 h-3.5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-500 line-through">{f.name}</p>
+                {f.description && <p className="text-xs text-slate-400 truncate">{f.description}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {disabled.length > 0 && (
+          <p className="text-xs text-slate-400 mt-4">
+            برای فعال‌سازی قابلیت‌های بیشتر، پلن خود را ارتقا دهید. جهت ارتقا با پشتیبانی در تماس باشید.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

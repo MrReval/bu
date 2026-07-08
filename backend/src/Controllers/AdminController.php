@@ -15,6 +15,7 @@ use Salon\Services\StaffProfileService;
 use Salon\Services\UpdateService;
 use Salon\Services\UploadService;
 use Salon\SystemInfo;
+use Salon\Tenant\FeatureGate;
 use Salon\Tenant\TenantContext;
 
 final class AdminController
@@ -22,6 +23,52 @@ final class AdminController
     private static function sid(): int
     {
         return TenantContext::siteId();
+    }
+
+    /** اشتراک فعلی سایت و قابلیت‌های آن */
+    public static function subscription(Request $req): void
+    {
+        $pdo = Connection::get();
+        $site = TenantContext::site();
+        $siteId = self::sid();
+
+        $package = null;
+        if (!empty($site['package_id'])) {
+            $stmt = $pdo->prepare('SELECT name, description, price_monthly, price_yearly FROM packages WHERE id = ?');
+            $stmt->execute([(int) $site['package_id']]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $package = [
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'price_monthly' => (int) $row['price_monthly'],
+                    'price_yearly' => (int) $row['price_yearly'],
+                ];
+            }
+        }
+
+        $enabled = FeatureGate::enabledKeys($siteId);
+        $allFeatures = $pdo->query('SELECT feature_key, name, description FROM features ORDER BY sort_order, id')->fetchAll();
+        $features = array_map(static fn ($f) => [
+            'key' => $f['feature_key'],
+            'name' => $f['name'],
+            'description' => $f['description'],
+            'enabled' => in_array($f['feature_key'], $enabled, true),
+        ], $allFeatures);
+
+        $subStmt = $pdo->prepare('SELECT period, amount, starts_at, expires_at FROM subscriptions WHERE site_id = ? ORDER BY id DESC LIMIT 1');
+        $subStmt->execute([$siteId]);
+        $sub = $subStmt->fetch() ?: null;
+
+        Response::json([
+            'package' => $package,
+            'status' => $site['status'] ?? 'active',
+            'expires_at' => $site['expires_at'] ?? null,
+            'subscription' => $sub ?: null,
+            'features' => $features,
+            'enabled_count' => count(array_filter($features, static fn ($f) => $f['enabled'])),
+            'total_count' => count($features),
+        ]);
     }
 
     public static function dashboard(Request $req): void

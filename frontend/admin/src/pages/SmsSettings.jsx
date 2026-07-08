@@ -26,14 +26,14 @@ const SAMPLES = {
       { order: 1, name: 'salon', label: 'نام سالن' },
       { order: 2, name: 'time', label: 'زمان نوبت' },
     ],
-    text: '{سالن}\nنوبت شما با موفقیت ثبت شد.\nزمان: {زمان}\nمنتظر حضورتان هستیم.',
+    text: '{salon}\nنوبت شما با موفقیت ثبت شد.\nزمان: {time}\nمنتظر حضورتان هستیم.',
   },
   status_change: {
     params: [
       { order: 1, name: 'salon', label: 'نام سالن' },
       { order: 2, name: 'status', label: 'وضعیت نوبت (تأیید/لغو/انجام شد)' },
     ],
-    text: '{سالن}\nوضعیت نوبت شما: {وضعیت}',
+    text: '{salon}\nوضعیت نوبت شما: {status}',
   },
 };
 
@@ -117,7 +117,7 @@ export default function SmsSettings() {
             const sample = SAMPLES[key];
             const paramText = provider === 'smsir'
               ? sample.params.map((p) => `${p.name} = ${p.label}`).join(' | ')
-              : sample.params.map((p) => `پارامتر ${toFa(p.order)}: ${p.label}`).join(' | ');
+              : sample.params.map((p) => `{${p.name}} = ${p.label} (پارامتر ${toFa(p.order)})`).join(' | ');
             return (
               <div key={key} className="mb-4 rounded-xl border border-slate-100 p-3">
                 <div className="flex flex-wrap items-center gap-3">
