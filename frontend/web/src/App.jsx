@@ -7,6 +7,7 @@ import Book from './pages/Book';
 import StaffProfile from './pages/StaffProfile';
 import Login from './pages/Login';
 import MyAppointments from './pages/MyAppointments';
+import Survey from './pages/Survey';
 
 export default function App() {
   const [settings, setSettings] = useState(null);
@@ -25,6 +26,31 @@ export default function App() {
     if (settings.name) document.title = settings.name;
   }, [settings]);
 
+  // فعال‌سازی PWA در صورت فعال‌بودن فیچر برای این سایت
+  useEffect(() => {
+    if (!settings || !(settings.features || []).includes('pwa')) return;
+
+    let link = document.querySelector('link[rel="manifest"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'manifest';
+      document.head.appendChild(link);
+    }
+    link.href = '/manifest.webmanifest';
+
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    meta.content = settings.primary_color || '#9d174d';
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, [settings]);
+
   if (!settings) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-pink-50">
@@ -41,6 +67,7 @@ export default function App() {
         <Route path="/book" element={<Book settings={settings} />} />
         <Route path="/login" element={<Login />} />
         <Route path="/my-appointments" element={<MyAppointments />} />
+        <Route path="/survey/:id/:token" element={<Survey />} />
       </Routes>
     </Layout>
   );

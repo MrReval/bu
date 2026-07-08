@@ -139,6 +139,9 @@ CREATE TABLE IF NOT EXISTS salon_settings (
     is_booking_enabled TINYINT NOT NULL DEFAULT 1,
     deposit_enabled TINYINT NOT NULL DEFAULT 0,
     default_deposit_percent INT NOT NULL DEFAULT 0,
+    bale_token VARCHAR(255) NOT NULL DEFAULT '',
+    bale_chat_id VARCHAR(100) NOT NULL DEFAULT '',
+    bale_daily_enabled TINYINT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
@@ -345,6 +348,7 @@ CREATE TABLE IF NOT EXISTS site_payment_settings (
     site_id INT NOT NULL PRIMARY KEY,
     provider VARCHAR(30) NOT NULL DEFAULT 'zibal',
     zibal_merchant VARCHAR(191) NOT NULL DEFAULT '',
+    enamad_code TEXT,
     is_enabled TINYINT NOT NULL DEFAULT 0,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
@@ -376,4 +380,17 @@ CREATE TABLE IF NOT EXISTS sms_logs (
     response TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_smslogs_site (site_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS survey_responses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    site_id INT NOT NULL,
+    appointment_id INT NOT NULL,
+    customer_id INT NULL,
+    rating TINYINT NOT NULL DEFAULT 5,
+    comment TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_survey_site (site_id),
+    UNIQUE KEY uq_survey_appointment (appointment_id),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

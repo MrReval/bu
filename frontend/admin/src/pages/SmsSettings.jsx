@@ -6,6 +6,8 @@ import { useToast } from '../context/Toast';
 const field =
   'w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-100 text-sm';
 
+const toFa = (n) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]);
+
 const credFields = {
   melipayamak: [['apikey', 'کلید API'], ['from', 'شماره فرستنده']],
   smsir: [['apikey', 'کلید API'], ['lineNumber', 'شماره خط']],
@@ -16,6 +18,24 @@ const events = [
   ['new_appointment', 'ثبت نوبت جدید'],
   ['status_change', 'تغییر وضعیت نوبت (تأیید/لغو)'],
 ];
+
+// نمونه متن و پارامترهای هر رویداد برای ثبت پترن نزد سرویس‌دهنده
+const SAMPLES = {
+  new_appointment: {
+    params: [
+      { order: 1, name: 'salon', label: 'نام سالن' },
+      { order: 2, name: 'time', label: 'زمان نوبت' },
+    ],
+    text: '{سالن}\nنوبت شما با موفقیت ثبت شد.\nزمان: {زمان}\nمنتظر حضورتان هستیم.',
+  },
+  status_change: {
+    params: [
+      { order: 1, name: 'salon', label: 'نام سالن' },
+      { order: 2, name: 'status', label: 'وضعیت نوبت (تأیید/لغو/انجام شد)' },
+    ],
+    text: '{سالن}\nوضعیت نوبت شما: {وضعیت}',
+  },
+};
 
 export default function SmsSettings() {
   const [providers, setProviders] = useState({});
@@ -93,26 +113,43 @@ export default function SmsSettings() {
 
         <div className="border-t border-slate-100 pt-4">
           <div className="text-sm font-medium text-slate-700 mb-3">رویدادهای ارسال و کد پترن</div>
-          {events.map(([key, label]) => (
-            <div key={key} className="flex items-center gap-3 mb-3">
-              <label className="flex items-center gap-2 text-sm text-slate-600 min-w-[13rem]">
-                <input
-                  type="checkbox"
-                  checked={eventsCfg[key] === undefined ? true : !!eventsCfg[key]}
-                  onChange={(e) => setEventsCfg({ ...eventsCfg, [key]: e.target.checked })}
-                />
-                {label}
-              </label>
-              <input
-                className={field}
-                dir="ltr"
-                placeholder="کد پترن (اختیاری)"
-                value={patterns[key] || ''}
-                onChange={(e) => setPatterns({ ...patterns, [key]: e.target.value })}
-              />
-            </div>
-          ))}
-          <p className="text-xs text-slate-400">اگر کد پترن خالی باشد، پیامک متنی ساده ارسال می‌شود.</p>
+          {events.map(([key, label]) => {
+            const sample = SAMPLES[key];
+            const paramText = provider === 'smsir'
+              ? sample.params.map((p) => `${p.name} = ${p.label}`).join(' | ')
+              : sample.params.map((p) => `پارامتر ${toFa(p.order)}: ${p.label}`).join(' | ');
+            return (
+              <div key={key} className="mb-4 rounded-xl border border-slate-100 p-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-600 min-w-[13rem]">
+                    <input
+                      type="checkbox"
+                      checked={eventsCfg[key] === undefined ? true : !!eventsCfg[key]}
+                      onChange={(e) => setEventsCfg({ ...eventsCfg, [key]: e.target.checked })}
+                    />
+                    {label}
+                  </label>
+                  <input
+                    className={`${field} flex-1 min-w-[10rem]`}
+                    dir="ltr"
+                    placeholder="کد پترن (اختیاری)"
+                    value={patterns[key] || ''}
+                    onChange={(e) => setPatterns({ ...patterns, [key]: e.target.value })}
+                  />
+                </div>
+                <div className="mt-2 bg-slate-50 rounded-lg p-3 text-xs text-slate-500 leading-6">
+                  <div className="font-medium text-slate-600 mb-1">نمونه متن پترن برای ثبت نزد سرویس‌دهنده:</div>
+                  <pre className="whitespace-pre-wrap font-sans text-slate-700 bg-white rounded-md p-2 border border-slate-100">{sample.text}</pre>
+                  <div className="mt-2">پارامترها: <span dir="ltr" className="text-slate-700">{paramText}</span></div>
+                </div>
+              </div>
+            );
+          })}
+          <div className="text-xs text-slate-400 leading-6">
+            <p>ابتدا این متن را در پنل سرویس‌دهنده به‌عنوان «پترن/الگو» ثبت کنید، سپس کد پترن دریافتی را در کادر بالا وارد کنید.</p>
+            <p>در ملی‌پیامک و کاوه‌نگار پارامترها به‌ترتیب جایگزین می‌شوند؛ در SMS.ir باید نام پارامتر دقیقاً همان مقدار انگلیسی (salon/time/status) باشد.</p>
+            <p>اگر کد پترن خالی باشد، پیامک متنی ساده ارسال می‌شود.</p>
+          </div>
         </div>
 
         <div className="flex justify-end">

@@ -17,7 +17,31 @@ final class Migrator
         foreach (self::splitStatements($sql) as $stmt) {
             $pdo->exec($stmt);
         }
+        self::ensureColumns();
         self::seedFeatures();
+        self::seedPackages();
+    }
+
+    /** افزودن ستون‌های جدید به جداول موجود (برای دیتابیس‌های از قبل نصب‌شده) */
+    private static function ensureColumns(): void
+    {
+        self::ensureColumn('site_payment_settings', 'enamad_code', 'TEXT NULL AFTER zibal_merchant');
+        self::ensureColumn('salon_settings', 'bale_token', "VARCHAR(255) NOT NULL DEFAULT ''");
+        self::ensureColumn('salon_settings', 'bale_chat_id', "VARCHAR(100) NOT NULL DEFAULT ''");
+        self::ensureColumn('salon_settings', 'bale_daily_enabled', 'TINYINT NOT NULL DEFAULT 0');
+    }
+
+    private static function ensureColumn(string $table, string $column, string $definition): void
+    {
+        $pdo = Connection::get();
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $stmt->execute([Config::dbName(), $table, $column]);
+        if ((int) $stmt->fetchColumn() === 0) {
+            $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+        }
     }
 
     /** @return string[] */
@@ -47,23 +71,89 @@ final class Migrator
     {
         $pdo = Connection::get();
         $features = [
-            ['booking', 'رزرو آنلاین', 'دریافت نوبت آنلاین از سایت', 0],
-            ['gallery', 'گالری تصاویر', 'نمایش گالری کارها در سایت', 1],
-            ['staff_portfolio', 'نمونه‌کار پرسنل', 'صفحه اختصاصی و نمونه‌کار هر پرسنل', 2],
-            ['multi_staff', 'چند پرسنل', 'امکان تعریف چند پرسنل', 3],
-            ['sms', 'پیامک', 'ارسال پیامک اطلاع‌رسانی به مشتری و پرسنل', 4],
-            ['deposit', 'بیعانه و درگاه پرداخت', 'دریافت بیعانه هنگام رزرو از طریق زیبال', 5],
-            ['landing_builder', 'شخصی‌سازی لندینگ', 'ویرایش بخش‌ها و ظاهر سایت', 6],
-            ['notifications', 'اعلان‌ها', 'مرکز اعلان‌های پنل مدیریت', 7],
+            ['dashboard', 'داشبورد مدیریت', 'پنل مدیریت سالن', 0],
+            ['booking', 'نوبت‌دهی آنلاین', 'دریافت نوبت آنلاین از سایت', 1],
+            ['website', 'وب‌سایت معرفی', 'وب‌سایت اختصاصی معرفی سالن', 2],
+            ['seo', 'وب‌سایت سئوشده', 'بهینه‌سازی برای موتورهای جستجو', 3],
+            ['multi_staff', 'مدیریت پرسنل', 'تعریف و مدیریت پرسنل', 4],
+            ['unlimited_staff', 'پرسنل نامحدود', 'بدون محدودیت تعداد پرسنل', 5],
+            ['staff_dashboard', 'داشبورد اختصاصی پرسنل', 'ورود هر پرسنل به پنل خودش', 6],
+            ['staff_portfolio', 'پروفایل و نمونه‌کار پرسنل', 'صفحه اختصاصی و نمونه‌کار هر پرسنل', 7],
+            ['gallery', 'گالری نمونه‌کار', 'نمایش گالری کارها در سایت', 8],
+            ['sms', 'ارسال پیامک', 'پیامک اطلاع‌رسانی به مشتری و پرسنل', 9],
+            ['deposit', 'دریافت بیعانه آنلاین', 'دریافت بیعانه هنگام رزرو از طریق زیبال', 10],
+            ['accounting', 'حسابداری', 'گزارش درآمد ماهانه/سالانه و به تفکیک پرسنل', 11],
+            ['customer_club', 'باشگاه مشتریان', 'پیامک گروهی، تبریک تولد و مناسبت‌ها', 12],
+            ['survey', 'نظرسنجی پس از خدمات', 'ارسال لینک نظرسنجی بعد از خدمت', 13],
+            ['qrcode', 'QR کد اختصاصی', 'دریافت QR کد زیبای سالن', 14],
+            ['pwa', 'اپلیکیشن اختصاصی (PWA)', 'نصب سایت به‌صورت اپ روی موبایل', 15],
+            ['bale_report', 'گزارش روزانه در بله', 'ارسال گزارش روزانه مدیر در پیام‌رسان بله', 16],
+            ['support', 'پشتیبانی', 'پشتیبانی استاندارد', 17],
+            ['priority_support', 'پشتیبانی اولویت‌دار', 'پاسخ‌گویی سریع‌تر', 18],
+            ['vip_support', 'پشتیبانی VIP', 'پشتیبانی اختصاصی و ویژه', 19],
+            ['dev_priority', 'اولویت توسعه امکانات', 'اولویت در توسعه قابلیت‌های جدید', 20],
+            ['landing_builder', 'شخصی‌سازی لندینگ', 'ویرایش بخش‌ها و ظاهر سایت', 21],
+            ['notifications', 'اعلان‌ها', 'مرکز اعلان‌های پنل مدیریت', 22],
         ];
         $check = $pdo->prepare('SELECT id FROM features WHERE feature_key = ?');
         $ins = $pdo->prepare(
             'INSERT INTO features (feature_key, name, description, sort_order) VALUES (?, ?, ?, ?)'
         );
+        $upd = $pdo->prepare(
+            'UPDATE features SET name = ?, description = ?, sort_order = ? WHERE feature_key = ?'
+        );
         foreach ($features as [$key, $name, $desc, $order]) {
             $check->execute([$key]);
             if (!$check->fetch()) {
                 $ins->execute([$key, $name, $desc, $order]);
+            } else {
+                $upd->execute([$name, $desc, $order, $key]);
+            }
+        }
+    }
+
+    /** ساخت پکیج‌های پیش‌فرض پلتفرم (idempotent) */
+    public static function seedPackages(): void
+    {
+        $pdo = Connection::get();
+
+        $map = [];
+        foreach ($pdo->query('SELECT id, feature_key FROM features')->fetchAll() as $f) {
+            $map[$f['feature_key']] = (int) $f['id'];
+        }
+
+        $pro = ['dashboard', 'multi_staff', 'booking', 'website', 'notifications', 'support'];
+        $plus = array_merge($pro, [
+            'unlimited_staff', 'staff_dashboard', 'seo', 'gallery', 'staff_portfolio',
+            'sms', 'deposit', 'accounting', 'customer_club', 'survey', 'qrcode', 'pwa',
+            'landing_builder', 'priority_support',
+        ]);
+        $professional = array_merge($plus, ['bale_report', 'vip_support', 'dev_priority']);
+
+        // قیمت سالانه = ماهانه×۱۲ با ۱۵٪ تخفیف
+        $packages = [
+            ['پرو', 'مناسب سالن‌های کوچک', 2990000, 30498000, $pro],
+            ['پلاس', 'محبوب‌ترین پلن با امکانات کامل', 4990000, 50898000, $plus],
+            ['حرفه‌ای', 'حداکثر امکانات و پشتیبانی VIP', 6990000, 71298000, $professional],
+        ];
+
+        $check = $pdo->prepare('SELECT id FROM packages WHERE name = ?');
+        $insPkg = $pdo->prepare(
+            'INSERT INTO packages (name, description, price_monthly, price_yearly, is_active) VALUES (?,?,?,?,1)'
+        );
+        $insFeat = $pdo->prepare('INSERT INTO package_features (package_id, feature_id) VALUES (?, ?)');
+
+        foreach ($packages as [$name, $desc, $monthly, $yearly, $keys]) {
+            $check->execute([$name]);
+            if ($check->fetch()) {
+                continue;
+            }
+            $insPkg->execute([$name, $desc, $monthly, $yearly]);
+            $pkgId = (int) $pdo->lastInsertId();
+            foreach (array_unique($keys) as $k) {
+                if (isset($map[$k])) {
+                    $insFeat->execute([$pkgId, $map[$k]]);
+                }
             }
         }
     }
@@ -124,6 +214,142 @@ final class Migrator
             $ins->execute([$siteId, $catNail, 'پدیکور', 'پدیکور کامل', 60, 350000]);
             $ins->execute([$siteId, $catNail, 'کاشت ناخن', 'کاشت و طراحی', 90, 800000]);
             $ins->execute([$siteId, $catHair, 'کوتاهی مو', 'کوتاهی و استایل', 30, 200000]);
+        }
+
+        self::seedDefaultImages($siteId);
+    }
+
+    /** مسیر پوشه‌ی عکس‌های دموی اولیه (import/uploads) */
+    private static function importUploadsDir(): string
+    {
+        return dirname(Config::basePath()) . '/import/uploads';
+    }
+
+    /** کپی یک فایل دمو به فضای آپلود سایت و بازگرداندن مسیر عمومی */
+    private static function copyDemoFile(string $src, int $siteId, string $folder): ?string
+    {
+        if (!is_file($src)) {
+            return null;
+        }
+        $ext = strtolower(pathinfo($src, PATHINFO_EXTENSION)) ?: 'jpg';
+        $dir = Config::storagePath() . '/uploads/' . $siteId . '/' . $folder;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return null;
+        }
+        $name = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        if (!@copy($src, $dir . '/' . $name)) {
+            return null;
+        }
+        return '/uploads/' . $siteId . '/' . $folder . '/' . $name;
+    }
+
+    /** @return string[] فایل‌های تصویری یک پوشه */
+    private static function imageFiles(string $dir): array
+    {
+        if (!is_dir($dir)) {
+            return [];
+        }
+        $out = [];
+        foreach (scandir($dir) as $f) {
+            $full = $dir . '/' . $f;
+            if (is_file($full) && preg_match('/\.(jpe?g|png|webp|gif)$/i', $f)) {
+                $out[] = $full;
+            }
+        }
+        sort($out);
+        return $out;
+    }
+
+    /** عکس‌های پیش‌فرض سایت (هیرو/لوگو/گالری) */
+    public static function seedDefaultImages(int $siteId): void
+    {
+        $base = self::importUploadsDir();
+        if (!is_dir($base)) {
+            return;
+        }
+        $pdo = Connection::get();
+
+        $heroFiles = self::imageFiles($base . '/hero');
+        if ($heroFiles) {
+            $check = $pdo->prepare("SELECT hero_image FROM salon_settings WHERE site_id = ?");
+            $check->execute([$siteId]);
+            if (!$check->fetchColumn()) {
+                $dest = self::copyDemoFile($heroFiles[0], $siteId, 'hero');
+                if ($dest) {
+                    $pdo->prepare('UPDATE salon_settings SET hero_image = ? WHERE site_id = ?')->execute([$dest, $siteId]);
+                }
+            }
+        }
+
+        $logoFiles = self::imageFiles($base . '/logo');
+        if ($logoFiles) {
+            $check = $pdo->prepare("SELECT logo_path FROM salon_settings WHERE site_id = ?");
+            $check->execute([$siteId]);
+            if (!$check->fetchColumn()) {
+                $dest = self::copyDemoFile($logoFiles[0], $siteId, 'logo');
+                if ($dest) {
+                    $pdo->prepare('UPDATE salon_settings SET logo_path = ? WHERE site_id = ?')->execute([$dest, $siteId]);
+                }
+            }
+        }
+
+        $galleryFiles = self::imageFiles($base . '/gallery');
+        if ($galleryFiles) {
+            $cnt = $pdo->prepare('SELECT COUNT(*) FROM gallery_images WHERE site_id = ?');
+            $cnt->execute([$siteId]);
+            if ((int) $cnt->fetchColumn() === 0) {
+                $ins = $pdo->prepare('INSERT INTO gallery_images (site_id, file_path, sort_order) VALUES (?,?,?)');
+                $order = 0;
+                foreach ($galleryFiles as $g) {
+                    $dest = self::copyDemoFile($g, $siteId, 'gallery');
+                    if ($dest) {
+                        $ins->execute([$siteId, $dest, $order++]);
+                    }
+                }
+            }
+        }
+    }
+
+    /** عکس آواتار و نمونه‌کار پیش‌فرض برای پرسنل تازه‌ساخته‌شده */
+    public static function seedStaffMedia(int $siteId, int $staffId): void
+    {
+        $base = self::importUploadsDir();
+        if (!is_dir($base)) {
+            return;
+        }
+        $pdo = Connection::get();
+
+        $avatars = self::imageFiles($base . '/avatars');
+        if ($avatars) {
+            $dest = self::copyDemoFile($avatars[0], $siteId, 'avatars');
+            if ($dest) {
+                $pdo->prepare('UPDATE staff SET avatar_path = ? WHERE id = ? AND site_id = ?')->execute([$dest, $staffId, $siteId]);
+            }
+        }
+
+        // نمونه‌کارها معمولاً در import/uploads/portfolio/<oldStaffId>/... هستند
+        $portfolioFiles = [];
+        $portfolioRoot = $base . '/portfolio';
+        if (is_dir($portfolioRoot)) {
+            foreach (scandir($portfolioRoot) as $sub) {
+                if ($sub === '.' || $sub === '..') {
+                    continue;
+                }
+                $portfolioFiles = array_merge($portfolioFiles, self::imageFiles($portfolioRoot . '/' . $sub));
+            }
+            $portfolioFiles = array_merge($portfolioFiles, self::imageFiles($portfolioRoot));
+        }
+        if ($portfolioFiles) {
+            $ins = $pdo->prepare(
+                'INSERT INTO staff_portfolio (site_id, staff_id, file_path, sort_order) VALUES (?,?,?,?)'
+            );
+            $order = 0;
+            foreach ($portfolioFiles as $p) {
+                $dest = self::copyDemoFile($p, $siteId, 'portfolio/' . $staffId);
+                if ($dest) {
+                    $ins->execute([$siteId, $staffId, $dest, $order++]);
+                }
+            }
         }
     }
 

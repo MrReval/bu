@@ -92,12 +92,24 @@ final class IntegrationController
         FeatureGate::require('deposit');
         $sid = TenantContext::siteId();
         $b = $req->body;
+        $isEnabled = !empty($b['is_enabled']);
+        $enamad = trim((string) ($b['enamad_code'] ?? ''));
+        $merchant = trim((string) ($b['zibal_merchant'] ?? ''));
+
+        if ($isEnabled && $enamad === '') {
+            Response::error('برای فعال‌سازی دریافت بیعانه، وارد کردن کد نماد اعتماد الکترونیکی (اینماد) الزامی است');
+        }
+        if ($isEnabled && $merchant === '') {
+            Response::error('برای فعال‌سازی دریافت بیعانه، مرچنت زیبال الزامی است');
+        }
+
         Connection::get()->prepare(
-            'UPDATE site_payment_settings SET provider=?, zibal_merchant=?, is_enabled=?, updated_at=NOW() WHERE site_id=?'
+            'UPDATE site_payment_settings SET provider=?, zibal_merchant=?, enamad_code=?, is_enabled=?, updated_at=NOW() WHERE site_id=?'
         )->execute([
             'zibal',
-            trim((string) ($b['zibal_merchant'] ?? '')),
-            (int) (!empty($b['is_enabled'])),
+            $merchant,
+            $enamad,
+            (int) $isEnabled,
             $sid,
         ]);
         Response::json(['ok' => true]);

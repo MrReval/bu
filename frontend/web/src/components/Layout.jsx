@@ -172,6 +172,14 @@ export default function Layout({ settings, children }) {
             )}
           </div>
         </div>
+        {settings.enamad_code && (
+          <div className="border-t border-white/10 flex justify-center py-6">
+            <div
+              className="bg-white/95 rounded-xl p-2 inline-flex items-center [&_img]:h-auto [&_img]:max-h-24 [&_img]:w-auto"
+              dangerouslySetInnerHTML={{ __html: settings.enamad_code }}
+            />
+          </div>
+        )}
         <div className="border-t border-white/10 text-center py-4 text-xs text-white/50">
           © {new Date().getFullYear()} {settings.name}
         </div>

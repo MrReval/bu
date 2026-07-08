@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use Salon\Controllers\AccountingController;
 use Salon\Controllers\AdminController;
 use Salon\Controllers\AppointmentController;
 use Salon\Controllers\AuthController;
+use Salon\Controllers\BaleController;
+use Salon\Controllers\CustomerClubController;
 use Salon\Controllers\IntegrationController;
 use Salon\Controllers\PaymentController;
 use Salon\Controllers\PublicController;
+use Salon\Controllers\SurveyController;
 use Salon\Router;
 
 return function (Router $router): void {
@@ -30,6 +34,10 @@ return function (Router $router): void {
     // پرداخت بیعانه (زیبال)
     $router->post('/api/v1/payments/deposit/{id}', [PaymentController::class, 'startDeposit']);
     $router->get('/api/v1/payments/callback', [PaymentController::class, 'callback']);
+
+    // نظرسنجی پس از خدمات (عمومی، با توکن امضاشده)
+    $router->get('/api/v1/survey/{id}/{token}', [SurveyController::class, 'info']);
+    $router->post('/api/v1/survey/{id}/{token}', [SurveyController::class, 'submit']);
 
     $admin = ['manager', 'super_admin'];
     $staffAdmin = ['staff', 'manager', 'super_admin'];
@@ -83,4 +91,19 @@ return function (Router $router): void {
     $router->post('/api/v1/admin/sms/test', [IntegrationController::class, 'testSms'], $admin);
     $router->get('/api/v1/admin/payment', [IntegrationController::class, 'getPayment'], $admin);
     $router->patch('/api/v1/admin/payment', [IntegrationController::class, 'updatePayment'], $admin);
+
+    // حسابداری و گزارش درآمد
+    $router->get('/api/v1/admin/accounting/summary', [AccountingController::class, 'summary'], $admin);
+
+    // باشگاه مشتریان
+    $router->get('/api/v1/admin/club', [CustomerClubController::class, 'index'], $admin);
+    $router->post('/api/v1/admin/club/broadcast', [CustomerClubController::class, 'broadcast'], $admin);
+
+    // نظرسنجی (فهرست نتایج در پنل)
+    $router->get('/api/v1/admin/surveys', [SurveyController::class, 'list'], $admin);
+
+    // گزارش روزانه بله
+    $router->get('/api/v1/admin/bale', [BaleController::class, 'get'], $admin);
+    $router->patch('/api/v1/admin/bale', [BaleController::class, 'update'], $admin);
+    $router->post('/api/v1/admin/bale/test', [BaleController::class, 'test'], $admin);
 };

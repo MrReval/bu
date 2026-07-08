@@ -77,6 +77,46 @@ final class SmsService
         }
     }
 
+    /** ارسال لینک نظرسنجی پس از تکمیل خدمت (در صورت فعال‌بودن فیچر و پیامک) */
+    public static function sendSurveyLink(int $appointmentId): void
+    {
+        try {
+            $siteId = TenantContext::siteIdOrNull();
+            if ($siteId === null || !FeatureGate::has('survey') || !FeatureGate::has('sms')) {
+                return;
+            }
+            $settings = self::siteSettings($siteId);
+            if (!$settings || !(int) $settings['is_enabled']) {
+                return;
+            }
+            $apt = AppointmentService::getById($appointmentId);
+            $phone = (string) ($apt['customer_phone'] ?? '');
+            if ($phone === '') {
+                return;
+            }
+            $domain = self::siteDomain($siteId);
+            if ($domain === '') {
+                return;
+            }
+            $token = SurveyService::token($appointmentId);
+            $link = 'https://' . $domain . '/survey/' . $appointmentId . '/' . $token;
+            $salon = self::salonName($siteId);
+            $msg = ($salon ? $salon . "\n" : '') . "از حضور شما سپاسگزاریم.\nلطفاً نظر خود را ثبت کنید:\n" . $link;
+            $creds = json_decode($settings['credentials_json'] ?? '{}', true) ?: [];
+            $driver = SmsManager::driver($settings['provider'] ?? 'melipayamak', $creds);
+            $result = $driver->send($phone, $msg);
+            self::log($siteId, $phone, $msg, $settings['provider'] ?? '', $result);
+        } catch (\Throwable $e) {
+        }
+    }
+
+    private static function siteDomain(int $siteId): string
+    {
+        $stmt = Connection::get()->prepare('SELECT domain FROM sites WHERE id = ?');
+        $stmt->execute([$siteId]);
+        return (string) ($stmt->fetchColumn() ?: '');
+    }
+
     private static function dispatch(int $siteId, array $settings, string $phone, string $message, string $event, array $params): void
     {
         if ($phone === '') {

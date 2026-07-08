@@ -42,9 +42,13 @@ final class PublicController
         $row['features'] = FeatureGate::enabledKeys();
 
         // آیا درگاه پرداخت فعال است (برای دریافت بیعانه)
-        $pay = $pdo->prepare('SELECT is_enabled FROM site_payment_settings WHERE site_id = ?');
+        $pay = $pdo->prepare('SELECT is_enabled, enamad_code FROM site_payment_settings WHERE site_id = ?');
         $pay->execute([$sid]);
-        $row['payment_enabled'] = (bool) ($pay->fetchColumn() ?: false) && FeatureGate::has('deposit');
+        $payRow = $pay->fetch() ?: [];
+        $payEnabled = (bool) ($payRow['is_enabled'] ?? false) && FeatureGate::has('deposit');
+        $row['payment_enabled'] = $payEnabled;
+        // کد نماد اعتماد الکترونیکی فقط وقتی درگاه فعال است در فوتر نمایش داده می‌شود
+        $row['enamad_code'] = $payEnabled ? (string) ($payRow['enamad_code'] ?? '') : '';
 
         Response::json($row);
     }

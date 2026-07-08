@@ -318,6 +318,15 @@ final class AdminController
                     $sid,
                 ]);
             } else {
+                // محدودیت تعداد پرسنل برای پکیج‌های بدون قابلیت «پرسنل نامحدود» (مثل پرو: حداکثر ۳)
+                if (!\Salon\Tenant\FeatureGate::has('unlimited_staff')) {
+                    $cnt = $pdo->prepare('SELECT COUNT(*) FROM staff WHERE site_id = ?');
+                    $cnt->execute([$sid]);
+                    if ((int) $cnt->fetchColumn() >= 3) {
+                        $pdo->rollBack();
+                        Response::error('در پکیج فعلی حداکثر ۳ پرسنل مجاز است. برای پرسنل نامحدود پکیج را ارتقا دهید.', 403);
+                    }
+                }
                 $userId = null;
                 if (!empty($b['email']) && !empty($b['password'])) {
                     $userId = AuthService::createAdmin($b['display_name'], $b['email'], $b['password'], 'staff', $sid);

@@ -198,6 +198,9 @@ final class AppointmentService
 
         NotificationService::notifyCustomerStatus($id, (int) $row['customer_id'], $status);
         SmsService::onStatusChange($id, $status);
+        if ($status === 'completed') {
+            SmsService::sendSurveyLink($id);
+        }
 
         return self::getById($id);
     }

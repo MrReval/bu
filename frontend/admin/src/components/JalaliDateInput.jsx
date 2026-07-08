@@ -15,7 +15,7 @@ const MONTHS = [
 ];
 
 export default function JalaliDateInput({ value, onChange, className = '' }) {
-  const init = value ? toJalaliParts(value + 'T12:00:00') : toJalaliParts(new Date());
+  const init = value ? toJalaliParts(value + 'T12:00:00') : null;
   const [jy, setJy] = useState(init?.year || '');
   const [jm, setJm] = useState(init?.month || '');
   const [jd, setJd] = useState(init?.day || '');
@@ -41,32 +41,25 @@ export default function JalaliDateInput({ value, onChange, className = '' }) {
   };
 
   const daysInMonth = jy && jm ? jalaaliMonthLength(jy, jm) : 31;
+  const selectCls = 'border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-sm';
 
   return (
     <div className={className}>
       <div className="flex flex-wrap gap-2">
         <select
           value={jy}
-          onChange={(e) => {
-            const y = +e.target.value;
-            setJy(y);
-            emit(y, jm, jd);
-          }}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-sm min-w-[5.5rem]"
+          onChange={(e) => { const y = +e.target.value; setJy(y); emit(y, jm, jd); }}
+          className={`${selectCls} min-w-[5.5rem]`}
         >
           <option value="">سال</option>
-          {jalaliYearOptions().map((y) => (
+          {jalaliYearOptions(6).map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
         <select
           value={jm}
-          onChange={(e) => {
-            const m = +e.target.value;
-            setJm(m);
-            emit(jy, m, jd);
-          }}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-sm flex-1 min-w-[6rem]"
+          onChange={(e) => { const m = +e.target.value; setJm(m); emit(jy, m, jd); }}
+          className={`${selectCls} flex-1 min-w-[6rem]`}
         >
           <option value="">ماه</option>
           {MONTHS.map((m) => (
@@ -75,12 +68,8 @@ export default function JalaliDateInput({ value, onChange, className = '' }) {
         </select>
         <select
           value={jd}
-          onChange={(e) => {
-            const d = +e.target.value;
-            setJd(d);
-            emit(jy, jm, d);
-          }}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-sm min-w-[4.5rem]"
+          onChange={(e) => { const d = +e.target.value; setJd(d); emit(jy, jm, d); }}
+          className={`${selectCls} min-w-[4.5rem]`}
         >
           <option value="">روز</option>
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (

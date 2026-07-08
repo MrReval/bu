@@ -185,6 +185,16 @@ if (!TenantResolver::siteIsActive()) {
     exit;
 }
 
+// ── PWA: manifest و service worker (در صورت فعال‌بودن فیچر) ─────────────
+if ($path === '/manifest.webmanifest') {
+    Salon\Controllers\PwaController::manifest();
+    exit;
+}
+if ($path === '/sw.js') {
+    Salon\Controllers\PwaController::serviceWorker();
+    exit;
+}
+
 // ── API سایت ────────────────────────────────────────────────────────────
 if (str_starts_with($path, '/api')) {
     $request = Request::fromGlobals();

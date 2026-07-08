@@ -8,6 +8,7 @@ const field =
 
 export default function PaymentSettings() {
   const [merchant, setMerchant] = useState('');
+  const [enamad, setEnamad] = useState('');
   const [isEnabled, setIsEnabled] = useState(false);
   const toast = useToast();
 
@@ -15,16 +16,23 @@ export default function PaymentSettings() {
     api('/admin/payment')
       .then((d) => {
         setMerchant(d.zibal_merchant || '');
+        setEnamad(d.enamad_code || '');
         setIsEnabled(!!Number(d.is_enabled));
       })
       .catch((e) => toast.show(e.message, 'error'));
   }, []);
 
   const save = async () => {
+    if (isEnabled && !enamad.trim()) {
+      return toast.show('برای فعال‌سازی بیعانه، کد اینماد الزامی است', 'error');
+    }
+    if (isEnabled && !merchant.trim()) {
+      return toast.show('برای فعال‌سازی بیعانه، مرچنت زیبال الزامی است', 'error');
+    }
     try {
       await api('/admin/payment', {
         method: 'PATCH',
-        body: JSON.stringify({ zibal_merchant: merchant, is_enabled: isEnabled }),
+        body: JSON.stringify({ zibal_merchant: merchant, enamad_code: enamad, is_enabled: isEnabled }),
       });
       toast.show('تنظیمات درگاه ذخیره شد');
     } catch (e) {
@@ -52,6 +60,24 @@ export default function PaymentSettings() {
         <div>
           <label className="block text-sm text-slate-600 mb-1">Merchant زیبال</label>
           <input className={field} dir="ltr" value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="zibal یا کد مرچنت" />
+        </div>
+
+        <div>
+          <label className="block text-sm text-slate-600 mb-1">
+            کد نماد اعتماد الکترونیکی (اینماد)
+            {isEnabled && <span className="text-rose-500"> *</span>}
+          </label>
+          <textarea
+            className={`${field} font-mono`}
+            dir="ltr"
+            rows={4}
+            value={enamad}
+            onChange={(e) => setEnamad(e.target.value)}
+            placeholder={'<a referrerpolicy="origin" target="_blank" href="https://trustseal.enamad.ir/..."><img src="https://trustseal.enamad.ir/logo.aspx?id=..." alt="" /></a>'}
+          />
+          <p className="text-xs text-slate-400 mt-1 leading-6">
+            کد نماد را از پنل enamad.ir کپی و اینجا وارد کنید. با فعال‌بودن بیعانه، این نماد در فوتر سایت شما نمایش داده می‌شود.
+          </p>
         </div>
 
         <div className="flex justify-end">

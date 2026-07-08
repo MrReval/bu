@@ -26,7 +26,10 @@ final class SiteService
         $adminEmail = trim($data['admin_email'] ?? '');
         $adminPassword = (string) ($data['admin_password'] ?? '');
         $packageId = !empty($data['package_id']) ? (int) $data['package_id'] : null;
-        $expiresAt = !empty($data['expires_at']) ? (string) $data['expires_at'] : null;
+        // سایت‌ها ماهانه ساخته می‌شوند؛ اگر تاریخ انقضا داده نشود، یک ماه بعد محاسبه می‌شود
+        $expiresAt = !empty($data['expires_at'])
+            ? (string) $data['expires_at']
+            : date('Y-m-d H:i:s', strtotime('+1 month'));
 
         if ($name === '' || $domain === '') {
             throw new \InvalidArgumentException('نام و دامنه الزامی است');
@@ -60,6 +63,9 @@ final class SiteService
                 ->execute([$siteId, $adminId, $adminName, '#be185d']);
             $staffId = (int) $pdo->lastInsertId();
 
+            // آواتار و نمونه‌کار پیش‌فرض برای پرسنل مدیر
+            Migrator::seedStaffMedia($siteId, $staffId);
+
             $svcStmt = $pdo->prepare('SELECT id FROM services WHERE site_id = ?');
             $svcStmt->execute([$siteId]);
             $ins = $pdo->prepare('INSERT INTO service_staff (service_id, staff_id) VALUES (?, ?)');
@@ -76,7 +82,7 @@ final class SiteService
             $pdo->prepare('INSERT INTO site_sms_settings (site_id) VALUES (?)')->execute([$siteId]);
             $pdo->prepare('INSERT INTO site_payment_settings (site_id) VALUES (?)')->execute([$siteId]);
 
-            self::recordSubscription($siteId, $packageId, $data['period'] ?? 'manual', $expiresAt);
+            self::recordSubscription($siteId, $packageId, $data['period'] ?? 'monthly', $expiresAt);
 
             $pdo->commit();
         } catch (\Throwable $e) {

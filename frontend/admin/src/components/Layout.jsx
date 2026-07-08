@@ -15,6 +15,11 @@ import {
   Image,
   MessageSquare,
   CreditCard,
+  BarChart3,
+  Gift,
+  Star,
+  QrCode,
+  Send,
 } from 'lucide-react';
 import { api, clearAuth, getUser } from '../../../shared/api';
 import { replaceGregorianDatesWithJalali } from '../../../shared/utils';
@@ -47,8 +52,13 @@ const NAV = [
   { to: '/staff', label: 'پرسنل', icon: Users, roles: ['super_admin', 'manager', 'staff'] },
   { to: '/gallery', label: 'گالری سایت', icon: Image, roles: ['super_admin', 'manager'], feature: 'gallery' },
   { to: '/customers', label: 'مشتریان', icon: UserCircle, roles: ['super_admin', 'manager'] },
+  { to: '/accounting', label: 'حسابداری', icon: BarChart3, roles: ['super_admin', 'manager'], feature: 'accounting' },
+  { to: '/club', label: 'باشگاه مشتریان', icon: Gift, roles: ['super_admin', 'manager'], feature: 'customer_club' },
+  { to: '/surveys', label: 'نظرسنجی‌ها', icon: Star, roles: ['super_admin', 'manager'], feature: 'survey' },
+  { to: '/qrcode', label: 'QR کد', icon: QrCode, roles: ['super_admin', 'manager'], feature: 'qrcode' },
   { to: '/sms', label: 'پیامک', icon: MessageSquare, roles: ['super_admin', 'manager'], feature: 'sms' },
   { to: '/payment', label: 'درگاه پرداخت', icon: CreditCard, roles: ['super_admin', 'manager'], feature: 'deposit' },
+  { to: '/bale', label: 'گزارش بله', icon: Send, roles: ['super_admin', 'manager'], feature: 'bale_report' },
   { to: '/settings', label: 'تنظیمات', icon: Settings, roles: ['super_admin', 'manager'] },
 ];
 

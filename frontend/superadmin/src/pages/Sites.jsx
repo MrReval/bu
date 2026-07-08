@@ -16,7 +16,7 @@ const field = 'w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:borde
 
 const emptyForm = {
   name: '', domain: '', admin_name: 'مدیر', admin_email: '', admin_password: '',
-  package_id: '', expires_at: '', period: 'monthly', status: 'active',
+  package_id: '', expires_at: '', status: 'active',
 };
 
 export default function Sites() {
@@ -54,19 +54,25 @@ export default function Sites() {
   const save = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
-        name: form.name, domain: form.domain, status: form.status,
-        package_id: form.package_id || null, period: form.period,
-        expires_at: form.expires_at || null,
-      };
       if (editing) {
-        await api(`/sites/${editing.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        await api(`/sites/${editing.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: form.name,
+            domain: form.domain,
+            status: form.status,
+            package_id: form.package_id || null,
+            expires_at: form.expires_at || null,
+          }),
+        });
         show('سایت ویرایش شد');
       } else {
         await api('/sites', {
           method: 'POST',
           body: JSON.stringify({
-            ...payload,
+            name: form.name,
+            domain: form.domain,
+            package_id: form.package_id || null,
             admin_name: form.admin_name,
             admin_email: form.admin_email,
             admin_password: form.admin_password,
@@ -230,24 +236,24 @@ export default function Sites() {
               {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">دوره</label>
-            <select className={field} value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}>
-              <option value="monthly">ماهانه</option>
-              <option value="yearly">سالانه</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">تاریخ انقضا (شمسی)</label>
-            <JalaliDateInput value={form.expires_at} onChange={(v) => setForm({ ...form, expires_at: v })} />
-          </div>
-          {editing && (
-            <div>
-              <label className="block text-sm text-slate-600 mb-1">وضعیت</label>
-              <select className={field} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                <option value="active">فعال</option>
-                <option value="suspended">غیرفعال</option>
-              </select>
+
+          {editing ? (
+            <>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">تاریخ انقضا / تمدید (شمسی)</label>
+                <JalaliDateInput value={form.expires_at} onChange={(v) => setForm({ ...form, expires_at: v })} />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">وضعیت</label>
+                <select className={field} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <option value="active">فعال</option>
+                  <option value="suspended">غیرفعال</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <div className="sm:col-span-2 text-xs text-slate-500 bg-brand-50 rounded-xl px-3 py-2.5 leading-6">
+              اشتراک ماهانه است؛ تاریخ انقضا به‌صورت خودکار یک ماه پس از ساخت تنظیم می‌شود و در صورت تمدید از همین‌جا قابل تغییر است.
             </div>
           )}
 

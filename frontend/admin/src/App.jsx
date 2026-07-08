@@ -13,6 +13,11 @@ import Customers from './pages/Customers';
 import Notifications from './pages/Notifications';
 import SmsSettings from './pages/SmsSettings';
 import PaymentSettings from './pages/PaymentSettings';
+import Accounting from './pages/Accounting';
+import CustomerClub from './pages/CustomerClub';
+import Surveys from './pages/Surveys';
+import QrCode from './pages/QrCode';
+import BaleReport from './pages/BaleReport';
 
 function Private({ children }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -41,8 +46,13 @@ export default function App() {
                   <Route path="/staff" element={<Staff />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="/customers" element={<Customers />} />
+                  <Route path="/accounting" element={<Accounting />} />
+                  <Route path="/club" element={<CustomerClub />} />
+                  <Route path="/surveys" element={<Surveys />} />
+                  <Route path="/qrcode" element={<QrCode />} />
                   <Route path="/sms" element={<SmsSettings />} />
                   <Route path="/payment" element={<PaymentSettings />} />
+                  <Route path="/bale" element={<BaleReport />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Layout>
