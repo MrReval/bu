@@ -17,6 +17,13 @@ import {
 import { api, formatPrice, mediaUrl } from '../../../shared/api';
 import { DAY_NAMES, getBusinessDayHours, normalizeBusinessHours, parseJson } from '../../../shared/utils';
 import { getCategoryIconComponent } from '../../../shared/categoryIcons';
+import heroDefault from '../assets/defaults/hero.jpg';
+import gallery1 from '../assets/defaults/gallery-1.jpg';
+import gallery2 from '../assets/defaults/gallery-2.jpg';
+import gallery3 from '../assets/defaults/gallery-3.jpg';
+import gallery4 from '../assets/defaults/gallery-4.jpg';
+import gallery5 from '../assets/defaults/gallery-5.jpg';
+import gallery6 from '../assets/defaults/gallery-6.jpg';
 
 const DEFAULT_TESTIMONIALS = [
   { name: 'سارا م.', text: 'بهترین مانیکور عمرم! محیط تمیز و برخورد عالی.', stars: 5 },
@@ -31,17 +38,10 @@ const FEATURES = [
   { icon: Gem, title: 'محیط لوکس', desc: 'فضایی آرام و بهداشتی برای آرامش شما' },
 ];
 
-// عکس‌های پیش‌فرض دمو (هیرو و گالری) که همیشه در دسترس‌اند
-const DEFAULT_HERO = '/defaults/hero.jpg';
-const DEFAULT_ABOUT = '/defaults/gallery-2.jpg';
-const DEFAULT_GALLERY = [
-  '/defaults/gallery-1.jpg',
-  '/defaults/gallery-2.jpg',
-  '/defaults/gallery-3.jpg',
-  '/defaults/gallery-4.jpg',
-  '/defaults/gallery-5.jpg',
-  '/defaults/gallery-6.jpg',
-];
+// عکس‌های پیش‌فرض دمو (هیرو و گالری) که در باندل قرار می‌گیرند و همیشه سرو می‌شوند
+const DEFAULT_HERO = heroDefault;
+const DEFAULT_ABOUT = gallery2;
+const DEFAULT_GALLERY = [gallery1, gallery2, gallery3, gallery4, gallery5, gallery6];
 
 function CategoryIcon({ name, className = 'w-6 h-6' }) {
   const Icon = getCategoryIconComponent(name);

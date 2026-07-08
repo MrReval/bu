@@ -9,13 +9,17 @@ import {
   X,
 } from 'lucide-react';
 import { api, mediaUrl } from '../../../shared/api';
+import portfolio1 from '../assets/defaults/portfolio-1.jpg';
+import portfolio2 from '../assets/defaults/portfolio-2.jpg';
+import gallery1 from '../assets/defaults/gallery-1.jpg';
+import gallery3 from '../assets/defaults/gallery-3.jpg';
 
 // نمونه‌کارهای پیش‌فرض (وقتی پرسنل هنوز نمونه‌کاری ثبت نکرده)
 const DEFAULT_PORTFOLIO = [
-  { id: -1, url: '/defaults/portfolio-1.jpg', caption: '' },
-  { id: -2, url: '/defaults/portfolio-2.jpg', caption: '' },
-  { id: -3, url: '/defaults/gallery-1.jpg', caption: '' },
-  { id: -4, url: '/defaults/gallery-3.jpg', caption: '' },
+  { id: -1, url: portfolio1, caption: '' },
+  { id: -2, url: portfolio2, caption: '' },
+  { id: -3, url: gallery1, caption: '' },
+  { id: -4, url: gallery3, caption: '' },
 ];
 
 export default function StaffProfile({ settings }) {
