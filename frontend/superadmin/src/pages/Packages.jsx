@@ -65,7 +65,7 @@ export default function Packages() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-extrabold text-slate-800">پکیج‌های اشتراک</h1>
         <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold">
           <Plus size={18} /> پکیج جدید

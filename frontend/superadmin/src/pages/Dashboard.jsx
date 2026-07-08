@@ -40,36 +40,38 @@ export default function Dashboard() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 font-bold text-slate-700">آخرین وب‌سایت‌ها</div>
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>
-              <th className="text-right px-6 py-3 font-medium">نام</th>
-              <th className="text-right px-6 py-3 font-medium">دامنه</th>
-              <th className="text-right px-6 py-3 font-medium">پکیج</th>
-              <th className="text-right px-6 py-3 font-medium">انقضا</th>
-              <th className="text-right px-6 py-3 font-medium">وضعیت</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(stats?.recent_sites || []).map((s) => (
-              <tr key={s.id} className="border-t border-slate-50">
-                <td className="px-6 py-3 font-medium text-slate-700">{s.name}</td>
-                <td className="px-6 py-3 text-slate-500" dir="ltr">{s.domain}</td>
-                <td className="px-6 py-3 text-slate-500">{s.package_name || '—'}</td>
-                <td className="px-6 py-3 text-slate-500">{formatDate(s.expires_at)}</td>
-                <td className="px-6 py-3">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${s.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                    {s.status === 'active' ? 'فعال' : 'غیرفعال'}
-                  </span>
-                </td>
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 font-bold text-slate-700">آخرین وب‌سایت‌ها</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[34rem]">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="text-right px-5 sm:px-6 py-3 font-medium">نام</th>
+                <th className="text-right px-5 sm:px-6 py-3 font-medium">دامنه</th>
+                <th className="text-right px-5 sm:px-6 py-3 font-medium">پکیج</th>
+                <th className="text-right px-5 sm:px-6 py-3 font-medium">انقضا</th>
+                <th className="text-right px-5 sm:px-6 py-3 font-medium">وضعیت</th>
               </tr>
-            ))}
-            {stats && stats.recent_sites?.length === 0 && (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">هنوز سایتی ثبت نشده است</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(stats?.recent_sites || []).map((s) => (
+                <tr key={s.id} className="border-t border-slate-50">
+                  <td className="px-5 sm:px-6 py-3 font-medium text-slate-700">{s.name}</td>
+                  <td className="px-5 sm:px-6 py-3 text-slate-500" dir="ltr">{s.domain}</td>
+                  <td className="px-5 sm:px-6 py-3 text-slate-500">{s.package_name || '—'}</td>
+                  <td className="px-5 sm:px-6 py-3 text-slate-500">{formatDate(s.expires_at)}</td>
+                  <td className="px-5 sm:px-6 py-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${s.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {s.status === 'active' ? 'فعال' : 'غیرفعال'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {stats && stats.recent_sites?.length === 0 && (
+                <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">هنوز سایتی ثبت نشده است</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
