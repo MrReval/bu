@@ -15,6 +15,7 @@ import {
 import ImageUpload from './ImageUpload';
 import PortfolioUpload from './PortfolioUpload';
 import { getUser } from '../../../shared/api';
+import { useVertical } from '../context/Vertical';
 
 const inputClass =
   'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400';
@@ -36,6 +37,8 @@ export default function StaffFormDrawer({
   onAvatarUploaded,
 }) {
   const isManager = ['super_admin', 'manager'].includes(getUser()?.role);
+  const { verticalFeatures } = useVertical();
+  const showPortfolio = verticalFeatures.staff_portfolio !== false;
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
@@ -244,7 +247,7 @@ export default function StaffFormDrawer({
               </div>
             )}
 
-            {editId && (
+            {editId && showPortfolio && (
               <div className="rounded-2xl border border-slate-200 p-4">
                 <PortfolioUpload staffId={editId} />
               </div>

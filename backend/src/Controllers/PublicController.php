@@ -30,7 +30,7 @@ final class PublicController
         $stmt->execute([$sid]);
         $row = $stmt->fetch();
         if (!$row) {
-            Response::error('سالن یافت نشد', 404);
+            Response::error('مجموعه یافت نشد', 404);
         }
         if (isset($row['business_hours_json'])) {
             $fixed = BusinessHoursService::normalizeJson((string) $row['business_hours_json']);

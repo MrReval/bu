@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Mail, Lock, LogIn } from 'lucide-react';
 import { api, setAuth } from '../../../shared/api';
+import { useVertical } from '../context/Vertical';
 
 export default function Login() {
+  const { labels } = useVertical();
   const [form, setForm] = useState({ login: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,8 +39,8 @@ export default function Login() {
           <div className="inline-flex w-14 h-14 rounded-2xl bg-pink-600 text-white items-center justify-center shadow-lg shadow-pink-600/30 mb-4">
             <Sparkles className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">پنل مدیریت سالن</h1>
-          <p className="text-slate-500 text-sm mt-1">ورود برای مدیران و پرسنل</p>
+          <h1 className="text-2xl font-bold text-slate-900">{labels.panel}</h1>
+          <p className="text-slate-500 text-sm mt-1">ورود برای مدیران و {labels.staff}</p>
         </div>
 
         <form onSubmit={submit} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 space-y-4">

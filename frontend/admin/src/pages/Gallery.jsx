@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { ImagePlus, Loader2, Trash2, Images } from 'lucide-react';
 import { api, uploadApi } from '../../../shared/api';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 
 export default function Gallery() {
+  const { verticalFeatures, loading: vLoading } = useVertical();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -25,6 +28,10 @@ export default function Gallery() {
   };
 
   useEffect(load, []);
+
+  if (!vLoading && verticalFeatures.gallery === false) {
+    return <Navigate to="/" replace />;
+  }
 
   const onUpload = async (e) => {
     const files = Array.from(e.target.files || []);

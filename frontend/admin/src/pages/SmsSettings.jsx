@@ -23,14 +23,14 @@ const events = [
 const SAMPLES = {
   new_appointment: {
     params: [
-      { order: 1, name: 'salon', label: 'نام سالن' },
+      { order: 1, name: 'salon', label: 'نام مجموعه' },
       { order: 2, name: 'time', label: 'زمان نوبت' },
     ],
     text: '{salon}\nنوبت شما با موفقیت ثبت شد.\nزمان: {time}\nمنتظر حضورتان هستیم.',
   },
   status_change: {
     params: [
-      { order: 1, name: 'salon', label: 'نام سالن' },
+      { order: 1, name: 'salon', label: 'نام مجموعه' },
       { order: 2, name: 'status', label: 'وضعیت نوبت (تأیید/لغو/انجام شد)' },
     ],
     text: '{salon}\nوضعیت نوبت شما: {status}',

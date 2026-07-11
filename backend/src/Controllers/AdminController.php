@@ -405,11 +405,87 @@ final class AdminController
     public static function customers(Request $req): void
     {
         $stmt = Connection::get()->prepare(
-            'SELECT u.id, u.name, u.phone, u.email, u.created_at, c.notes FROM users u
-             LEFT JOIN customers c ON c.user_id = u.id WHERE u.site_id = ? AND u.role = "customer" ORDER BY u.created_at DESC LIMIT 500'
+            'SELECT u.id, u.name, u.phone, u.email, u.created_at, c.notes, c.birth_date, c.national_id
+             FROM users u
+             LEFT JOIN customers c ON c.user_id = u.id
+             WHERE u.site_id = ? AND u.role = "customer"
+             ORDER BY u.created_at DESC LIMIT 500'
         );
         $stmt->execute([self::sid()]);
         Response::json($stmt->fetchAll());
+    }
+
+    public static function updateCustomer(Request $req, array $params): void
+    {
+        $pdo = Connection::get();
+        $id = (int) ($params['id'] ?? 0);
+        $check = $pdo->prepare('SELECT id FROM users WHERE id = ? AND site_id = ? AND role = "customer"');
+        $check->execute([$id, self::sid()]);
+        if (!$check->fetch()) {
+            Response::error('مشتری یافت نشد', 404);
+            return;
+        }
+
+        $b = $req->body;
+        if (isset($b['name']) || isset($b['email'])) {
+            $fields = [];
+            $vals = [];
+            if (isset($b['name'])) {
+                $fields[] = 'name = ?';
+                $vals[] = trim((string) $b['name']);
+            }
+            if (array_key_exists('email', $b)) {
+                $fields[] = 'email = ?';
+                $vals[] = $b['email'] !== null && $b['email'] !== '' ? trim((string) $b['email']) : null;
+            }
+            if ($fields) {
+                $vals[] = $id;
+                $pdo->prepare('UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($vals);
+            }
+        }
+
+        $notes = array_key_exists('notes', $b) ? (string) $b['notes'] : null;
+        $birth = array_key_exists('birth_date', $b) ? (string) $b['birth_date'] : null;
+        $nationalId = array_key_exists('national_id', $b) ? trim((string) $b['national_id']) : null;
+
+        $exists = $pdo->prepare('SELECT user_id FROM customers WHERE user_id = ?');
+        $exists->execute([$id]);
+        if ($exists->fetch()) {
+            $sets = [];
+            $vals = [];
+            if (array_key_exists('notes', $b)) {
+                $sets[] = 'notes = ?';
+                $vals[] = $notes;
+            }
+            if (array_key_exists('birth_date', $b)) {
+                $sets[] = 'birth_date = ?';
+                $vals[] = $birth !== '' ? $birth : null;
+            }
+            if (array_key_exists('national_id', $b)) {
+                $sets[] = 'national_id = ?';
+                $vals[] = $nationalId !== '' ? $nationalId : null;
+            }
+            if ($sets) {
+                $vals[] = $id;
+                $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE user_id = ?')->execute($vals);
+            }
+        } else {
+            $pdo->prepare(
+                'INSERT INTO customers (user_id, notes, birth_date, national_id) VALUES (?, ?, ?, ?)'
+            )->execute([
+                $id,
+                $notes,
+                $birth !== '' ? $birth : null,
+                $nationalId !== '' ? $nationalId : null,
+            ]);
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT u.id, u.name, u.phone, u.email, u.created_at, c.notes, c.birth_date, c.national_id
+             FROM users u LEFT JOIN customers c ON c.user_id = u.id WHERE u.id = ?'
+        );
+        $stmt->execute([$id]);
+        Response::json($stmt->fetch());
     }
 
     public static function notifications(Request $req): void

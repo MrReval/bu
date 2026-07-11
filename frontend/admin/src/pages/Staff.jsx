@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Users, CalendarCheck, Star, Scissors, Images } from 'lucide-react';
 import { api, getUser } from '../../../shared/api';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 import StaffFormDrawer from '../components/StaffFormDrawer';
 import StaffMyProfile from '../components/StaffMyProfile';
 
@@ -19,6 +20,7 @@ const emptyForm = {
 };
 
 export default function Staff() {
+  const { labels, verticalFeatures } = useVertical();
   const [staff, setStaff] = useState([]);
   const [services, setServices] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -29,6 +31,7 @@ export default function Staff() {
   const toast = useToast();
   const user = getUser();
   const isStaffRole = user?.role === 'staff';
+  const showPortfolio = verticalFeatures.staff_portfolio !== false;
 
   const load = () => {
     setLoading(true);
@@ -119,12 +122,12 @@ export default function Staff() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            {isStaffRole ? 'پروفایل من' : 'پرسنل'}
+            {isStaffRole ? 'پروفایل من' : labels.staff}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {isStaffRole
-              ? 'اطلاعات و نمونه کارهای خود را در همین صفحه مدیریت کنید'
-              : 'مدیریت پرسنل و خدمات قابل ارائه'}
+              ? 'اطلاعات خود را در همین صفحه مدیریت کنید'
+              : `مدیریت ${labels.staff} و ${labels.services} قابل ارائه`}
           </p>
         </div>
         {!isStaffRole && (
@@ -134,7 +137,7 @@ export default function Staff() {
             className="inline-flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            پرسنل جدید
+            {labels.staff_singular} جدید
           </button>
         )}
       </header>
@@ -142,7 +145,7 @@ export default function Staff() {
       {!isStaffRole && (
         <div className="grid grid-cols-2 gap-4">
           {[
-            { label: 'کل پرسنل', value: staffStats.total, icon: Users, tone: 'bg-pink-100 text-pink-600' },
+            { label: `کل ${labels.staff}`, value: staffStats.total, icon: Users, tone: 'bg-pink-100 text-pink-600' },
             { label: 'پذیرش نوبت', value: staffStats.accepting, icon: CalendarCheck, tone: 'bg-emerald-100 text-emerald-600' },
           ].map((s) => (
             <div key={s.label} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm flex items-center gap-3">
@@ -165,7 +168,7 @@ export default function Staff() {
       ) : staff.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 text-center">
           <p className="font-medium text-slate-700">
-            {isStaffRole ? 'پروفایل پرسنل یافت نشد' : 'هنوز پرسنلی ثبت نشده'}
+            {isStaffRole ? `پروفایل ${labels.staff_singular} یافت نشد` : `هنوز ${labels.staff}ی ثبت نشده`}
           </p>
           {!isStaffRole && (
             <button
@@ -174,7 +177,7 @@ export default function Staff() {
               className="mt-4 inline-flex items-center gap-2 text-sm text-pink-600 font-semibold hover:underline"
             >
               <Plus className="w-4 h-4" />
-              افزودن اولین پرسنل
+              افزودن اولین {labels.staff_singular}
             </button>
           )}
         </div>
@@ -250,9 +253,9 @@ export default function Staff() {
                     </span>
                     <span className="text-xs px-2.5 py-1 rounded-lg bg-pink-50 text-pink-700 font-medium flex items-center gap-1">
                       <Scissors className="w-3 h-3" />
-                      {new Intl.NumberFormat('fa-IR').format((s.service_ids || []).length)} خدمت
+                      {new Intl.NumberFormat('fa-IR').format((s.service_ids || []).length)} {labels.service}
                     </span>
-                    {(s.portfolio_count || 0) > 0 && (
+                    {showPortfolio && (s.portfolio_count || 0) > 0 && (
                       <span className="text-xs px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 font-medium flex items-center gap-1">
                         <Images className="w-3 h-3" />
                         {new Intl.NumberFormat('fa-IR').format(s.portfolio_count)} نمونه‌کار

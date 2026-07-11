@@ -12,8 +12,10 @@ import {
   todayGregorian,
 } from '../../../shared/utils';
 import StatCard from '../components/StatCard';
+import { useVertical } from '../context/Vertical';
 
 export default function Dashboard() {
+  const { labels } = useVertical();
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
 
@@ -47,15 +49,15 @@ export default function Dashboard() {
           to="/appointments"
           className="inline-flex items-center gap-2 text-sm font-medium text-white bg-pink-600 px-5 py-2.5 rounded-xl hover:bg-pink-700 shadow-sm shadow-pink-600/20 transition"
         >
-          مدیریت نوبت‌ها
+          مدیریت {labels.appointment}‌ها
           <ArrowLeft className="w-4 h-4" />
         </Link>
       </header>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <StatCard label="نوبت‌های امروز" value={stats.appointments_today} icon={Calendar} tone="pink" href="/appointments" subtitle="برنامه امروز" />
+        <StatCard label={`${labels.appointment}‌های امروز`} value={stats.appointments_today} icon={Calendar} tone="pink" href="/appointments" subtitle="برنامه امروز" />
         <StatCard label="در انتظار تأیید" value={stats.pending} icon={Clock} tone="amber" href="/appointments" subtitle="نیاز به بررسی" />
-        <StatCard label="مشتریان" value={stats.customers} icon={Users} tone="violet" href="/customers" subtitle="ثبت‌شده در سیستم" />
+        <StatCard label={`${labels.customer}ان`} value={stats.customers} icon={Users} tone="violet" href="/customers" subtitle="ثبت‌شده در سیستم" />
       </div>
 
       <section className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">

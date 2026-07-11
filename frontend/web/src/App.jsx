@@ -22,6 +22,7 @@ export default function App() {
     root.style.setProperty('--color-primary', settings.primary_color);
     root.style.setProperty('--color-secondary', settings.secondary_color);
     root.style.setProperty('--color-accent', settings.accent_color);
+    root.dataset.businessType = settings.business_type || 'beauty_salon';
     document.body.style.fontFamily = settings.font_family || 'Vazirmatn';
     if (settings.name) document.title = settings.name;
   }, [settings]);
@@ -53,8 +54,8 @@ export default function App() {
 
   if (!settings) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-pink-50">
-        <div className="animate-pulse text-pink-600">در حال بارگذاری...</div>
+      <div className="min-h-screen flex items-center justify-center bg-stone-100">
+        <div className="animate-pulse text-stone-500">در حال بارگذاری...</div>
       </div>
     );
   }

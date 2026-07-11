@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { getToken, getUser } from '../../shared/api';
 import { ToastProvider } from './context/Toast';
+import { VerticalProvider } from './context/Vertical';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -32,36 +33,38 @@ function Private({ children }) {
 export default function App() {
   return (
     <ToastProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/*"
-          element={
-            <Private>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/appointments" element={<Appointments />} />
-                  <Route path="/notifications" element={<Notifications />} />
-                  <Route path="/services" element={<Services />} />
-                  <Route path="/staff" element={<Staff />} />
-                  <Route path="/gallery" element={<Gallery />} />
-                  <Route path="/customers" element={<Customers />} />
-                  <Route path="/accounting" element={<Accounting />} />
-                  <Route path="/club" element={<CustomerClub />} />
-                  <Route path="/surveys" element={<Surveys />} />
-                  <Route path="/qrcode" element={<QrCode />} />
-                  <Route path="/sms" element={<SmsSettings />} />
-                  <Route path="/payment" element={<PaymentSettings />} />
-                  <Route path="/deposit-receipts" element={<DepositReceipts />} />
-                  <Route path="/bale" element={<BaleReport />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Routes>
-              </Layout>
-            </Private>
-          }
-        />
-      </Routes>
+      <VerticalProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <Private>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/appointments" element={<Appointments />} />
+                    <Route path="/notifications" element={<Notifications />} />
+                    <Route path="/services" element={<Services />} />
+                    <Route path="/staff" element={<Staff />} />
+                    <Route path="/gallery" element={<Gallery />} />
+                    <Route path="/customers" element={<Customers />} />
+                    <Route path="/accounting" element={<Accounting />} />
+                    <Route path="/club" element={<CustomerClub />} />
+                    <Route path="/surveys" element={<Surveys />} />
+                    <Route path="/qrcode" element={<QrCode />} />
+                    <Route path="/sms" element={<SmsSettings />} />
+                    <Route path="/payment" element={<PaymentSettings />} />
+                    <Route path="/deposit-receipts" element={<DepositReceipts />} />
+                    <Route path="/bale" element={<BaleReport />} />
+                    <Route path="/settings" element={<Settings />} />
+                  </Routes>
+                </Layout>
+              </Private>
+            }
+          />
+        </Routes>
+      </VerticalProvider>
     </ToastProvider>
   );
 }

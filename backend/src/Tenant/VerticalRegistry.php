@@ -69,6 +69,7 @@ final class VerticalRegistry
                 'staff_portfolio' => true,
                 'multi_service_booking' => true,
                 'staff_selection_required' => false,
+                'customer_national_id' => false,
             ],
             'labels' => [
                 'business' => 'سالن',
@@ -119,6 +120,7 @@ final class VerticalRegistry
                 'staff_portfolio' => false,
                 'multi_service_booking' => false,
                 'staff_selection_required' => true,
+                'customer_national_id' => true,
             ],
             'labels' => [
                 'business' => 'کلینیک',
@@ -169,6 +171,7 @@ final class VerticalRegistry
                 'staff_portfolio' => false,
                 'multi_service_booking' => false,
                 'staff_selection_required' => true,
+                'customer_national_id' => true,
             ],
             'labels' => [
                 'business' => 'مطب',

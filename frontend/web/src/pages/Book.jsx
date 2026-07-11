@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, formatPrice, formatDateTime, getToken, getUser } from '../../../shared/api';
-import { formatJalaliDateLong, formatJalaliTime, parseJson } from '../../../shared/utils';
+import { formatJalaliDateLong, formatJalaliTime } from '../../../shared/utils';
 import { getCategoryIconComponent } from '../../../shared/categoryIcons';
 import { ArrowRight, Calendar, CheckCircle2, ChevronDown, Clock, Copy, CreditCard, Home, Landmark, Scissors, Upload, User, Wallet } from 'lucide-react';
 import { todayGregorian } from '../../../shared/jalali';
+import { getLabels, getBookingRules } from '../../../shared/vertical';
 import MonthAvailabilityCalendar from '../components/MonthAvailabilityCalendar';
-
-const STEPS = ['خدمات', 'پرسنل', 'زمان', 'اطلاعات', 'تأیید'];
 
 function formatCardDisplay(num) {
   const d = String(num || '').replace(/\D/g, '');
@@ -15,6 +14,25 @@ function formatCardDisplay(num) {
 }
 
 export default function Book({ settings }) {
+  const labels = getLabels(settings);
+  const rules = getBookingRules(settings);
+  const allowStaff = rules.allow_staff_selection;
+  const staffRequired = !!rules.staff_selection_required && allowStaff;
+  const multiService = rules.multi_service !== false;
+
+  const staffStep = allowStaff ? 1 : -1;
+  const timeStep = allowStaff ? 2 : 1;
+  const infoStep = allowStaff ? 3 : 2;
+  const confirmStep = allowStaff ? 4 : 3;
+
+  const STEPS = [
+    labels.services,
+    ...(allowStaff ? [labels.staff] : []),
+    'زمان',
+    'اطلاعات',
+    'تأیید',
+  ];
+
   const [searchParams] = useSearchParams();
   const preStaffId = searchParams.get('staff');
   const [step, setStep] = useState(0);
@@ -32,15 +50,14 @@ export default function Book({ settings }) {
   const [submitting, setSubmitting] = useState(false);
   const [openSections, setOpenSections] = useState(() => new Set());
   const timesRef = useRef(null);
-  const [payMethod, setPayMethod] = useState('zibal'); // zibal | card
-  const [cardPay, setCardPay] = useState(null); // { appointment, amount }
+  const [payMethod, setPayMethod] = useState('zibal');
+  const [cardPay, setCardPay] = useState(null);
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState('');
   const [uploading, setUploading] = useState(false);
 
   const primary = settings.primary_color || '#9d174d';
-  const secondary = settings.secondary_color || '#500724';
-  const allowStaff = parseJson(settings.booking_rules_json).allow_staff_selection !== false;
+  const biz = labels.business;
 
   useEffect(() => {
     api('/services').then((d) => {
@@ -65,11 +82,11 @@ export default function Book({ settings }) {
     const catIds = new Set(categories.map((c) => Number(c.id)));
     const other = active.filter((s) => !s.category_id || !catIds.has(Number(s.category_id)));
     if (other.length) {
-      groups.push({ category: { id: 0, name: 'سایر خدمات' }, services: other });
+      groups.push({ category: { id: 0, name: `سایر ${labels.services}` }, services: other });
     }
 
     return groups;
-  }, [services, categories]);
+  }, [services, categories, labels.services]);
 
   const toggleSection = (categoryId) => {
     setOpenSections((prev) => {
@@ -87,6 +104,10 @@ export default function Book({ settings }) {
 
   const toggleService = (id) => {
     const nid = Number(id);
+    if (!multiService) {
+      setSelected((prev) => (prev.includes(nid) ? [] : [nid]));
+      return;
+    }
     setSelected((prev) => (prev.includes(nid) ? prev.filter((x) => x !== nid) : [...prev, nid]));
   };
 
@@ -95,7 +116,7 @@ export default function Book({ settings }) {
   }, [preStaffId]);
 
   useEffect(() => {
-    if (step === 1 && selected.length) {
+    if (step === staffStep && selected.length) {
       api(`/staff?service_id=${selected[0]}`).then((list) => {
         setStaff(list);
         if (preStaffId && list.some((s) => Number(s.id) === Number(preStaffId))) {
@@ -103,15 +124,17 @@ export default function Book({ settings }) {
         }
       }).catch(() => setStaff([]));
     }
-  }, [step, selected, preStaffId]);
+  }, [step, staffStep, selected, preStaffId]);
 
   useEffect(() => {
-    if (step === 2 && selected.length && date) {
+    if (step === timeStep && selected.length && date) {
       const q = new URLSearchParams({ service_ids: selected.join(','), date });
       if (staffId) q.set('staff_id', staffId);
       api(`/availability?${q}`).then((d) => setSlots(d.slots || [])).catch(() => setSlots([]));
     }
-  }, [step, selected, date, staffId]);
+  }, [step, timeStep, selected, date, staffId]);
+
+  const goAfterServices = () => setStep(allowStaff ? staffStep : timeStep);
 
   const totalPrice = services.filter((s) => isSelected(s.id)).reduce((a, s) => a + s.price, 0);
   const totalDuration = services.filter((s) => isSelected(s.id)).reduce((a, s) => a + s.duration_minutes, 0);
@@ -244,7 +267,7 @@ export default function Book({ settings }) {
             </div>
             <h1 className="text-xl font-bold text-stone-900">پرداخت بیعانه کارت‌به‌کارت</h1>
             <p className="text-sm text-stone-500 mt-2 leading-relaxed">
-              مبلغ بیعانه را به کارت زیر واریز کنید و تصویر فیش را ارسال کنید. پس از تأیید سالن، نوبت نهایی می‌شود.
+              مبلغ بیعانه را به کارت زیر واریز کنید و تصویر فیش را ارسال کنید. پس از تأیید {biz}، نوبت نهایی می‌شود.
             </p>
           </div>
 
@@ -327,10 +350,10 @@ export default function Book({ settings }) {
             </h1>
             <p className="text-stone-500 text-sm mt-2 leading-relaxed max-w-sm mx-auto">
               {waitingReceipt
-                ? 'فیش بیعانه برای مدیر سالن ارسال شد. پس از تأیید، نوبت شما نهایی می‌شود.'
+                ? `فیش بیعانه برای مدیر ${biz} ارسال شد. پس از تأیید، نوبت شما نهایی می‌شود.`
                 : isConfirmed
                   ? 'نوبت تأیید شد. در زمان مقرر منتظر دیدار شما هستیم.'
-                  : 'درخواست شما ثبت شد و پس از تأیید سالن، وضعیت نهایی اعلام می‌شود.'}
+                  : `درخواست شما ثبت شد و پس از تأیید ${biz}، وضعیت نهایی اعلام می‌شود.`}
             </p>
           </div>
 
@@ -361,7 +384,7 @@ export default function Book({ settings }) {
                 <div className="flex items-start gap-3">
                   <User className="w-[18px] h-[18px] text-pink-600 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <p className="text-[11px] text-stone-400 mb-0.5">پرسنل</p>
+                    <p className="text-[11px] text-stone-400 mb-0.5">{labels.staff_singular}</p>
                     <p className="font-semibold text-stone-900">{staffName}</p>
                   </div>
                 </div>
@@ -371,7 +394,7 @@ export default function Book({ settings }) {
                 <div className="flex items-start gap-3">
                   <Scissors className="w-[18px] h-[18px] text-pink-600 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <p className="text-[11px] text-stone-400 mb-0.5">خدمات</p>
+                    <p className="text-[11px] text-stone-400 mb-0.5">{labels.services}</p>
                     <p className="font-medium text-stone-800 text-sm leading-relaxed">{serviceNames.join(' · ')}</p>
                   </div>
                 </div>
@@ -397,7 +420,7 @@ export default function Book({ settings }) {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${isConfirmed && !waitingReceipt ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              {waitingReceipt ? 'در انتظار تأیید فیش' : isConfirmed ? 'تأیید شده' : 'در انتظار تأیید سالن'}
+              {waitingReceipt ? 'در انتظار تأیید فیش' : isConfirmed ? 'تأیید شده' : `در انتظار تأیید ${biz}`}
             </span>
           </div>
 
@@ -432,15 +455,15 @@ export default function Book({ settings }) {
   return (
     <div className="pb-20">
       <div className="relative py-16 px-4 text-white text-center overflow-hidden" style={{ backgroundColor: primary }}>
-        <h1 className="text-3xl font-bold relative z-10">رزرو آنلاین نوبت</h1>
-        <p className="text-pink-100 mt-2 relative z-10">در چند قدم ساده، وقت خود را رزرو کنید</p>
+        <h1 className="text-3xl font-bold relative z-10">{labels.book_title}</h1>
+        <p className="opacity-80 mt-2 relative z-10">در چند قدم ساده، {labels.appointment} خود را رزرو کنید</p>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 -mt-8 relative z-10">
-        <div className="bg-white rounded-3xl shadow-xl border border-pink-50 p-6 sm:p-8">
+        <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-6 sm:p-8">
           <div className="flex justify-between mb-8 gap-1">
             {STEPS.map((s, i) => (
-              <div key={s} className="flex-1 text-center">
+              <div key={`${s}-${i}`} className="flex-1 text-center">
                 <div
                   className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center text-xs font-bold mb-1 ${
                     i <= step ? 'text-white' : 'bg-stone-100 text-stone-400'
@@ -458,10 +481,14 @@ export default function Book({ settings }) {
 
           {step === 0 && (
             <div className="space-y-6">
-              <p className="text-sm text-stone-500 text-center">خدمات را از هر دسته انتخاب کنید (امکان انتخاب چند خدمت)</p>
+              <p className="text-sm text-stone-500 text-center">
+                {multiService
+                  ? `${labels.services} را از هر دسته انتخاب کنید (امکان انتخاب چند مورد)`
+                  : `یک ${labels.service} را انتخاب کنید`}
+              </p>
 
               {groupedServices.length === 0 ? (
-                <p className="text-center text-stone-500 py-8">خدمتی برای رزرو تعریف نشده</p>
+                <p className="text-center text-stone-500 py-8">{labels.service}ی برای رزرو تعریف نشده</p>
               ) : (
                 groupedServices.map(({ category, services: catServices }) => {
                   const isOpen = openSections.has(category.id);
@@ -485,7 +512,7 @@ export default function Book({ settings }) {
                         {picked > 0 && (
                           <span className="bg-white/25 text-xs px-2 py-0.5 rounded-full">{picked} انتخاب</span>
                         )}
-                        <span className="text-xs font-normal opacity-80 shrink-0">{catServices.length} خدمت</span>
+                        <span className="text-xs font-normal opacity-80 shrink-0">{catServices.length} مورد</span>
                       </button>
                       <div
                         className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
@@ -495,18 +522,21 @@ export default function Book({ settings }) {
                         <div className="overflow-hidden">
                           <div className="p-3 space-y-2 bg-stone-50/50 border-t border-stone-100">
                             {catServices.length === 0 ? (
-                              <p className="text-center text-stone-400 text-sm py-6">به‌زودی خدمات این بخش اضافه می‌شود</p>
+                              <p className="text-center text-stone-400 text-sm py-6">به‌زودی موارد این بخش اضافه می‌شود</p>
                             ) : (
                               catServices.map((s) => (
                                 <label
                                   key={s.id}
                                   className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition bg-white ${
-                                    isSelected(s.id) ? 'border-pink-400 shadow-sm' : 'border-transparent hover:border-pink-200'
+                                    isSelected(s.id) ? 'shadow-sm' : 'border-transparent hover:border-stone-200'
                                   }`}
+                                  style={isSelected(s.id) ? { borderColor: primary } : {}}
                                 >
                                   <input
-                                    type="checkbox"
-                                    className="w-5 h-5 accent-pink-600 shrink-0"
+                                    type={multiService ? 'checkbox' : 'radio'}
+                                    name="book-service"
+                                    className="w-5 h-5 shrink-0 accent-current"
+                                    style={{ accentColor: primary }}
                                     checked={isSelected(s.id)}
                                     onChange={() => toggleService(s.id)}
                                   />
@@ -534,8 +564,8 @@ export default function Book({ settings }) {
               )}
 
               {selected.length > 0 && (
-                <div className="flex justify-between text-sm bg-pink-50 rounded-xl px-4 py-3 border border-pink-100">
-                  <span className="text-stone-600">{selected.length} خدمت انتخاب شده</span>
+                <div className="flex justify-between text-sm rounded-xl px-4 py-3 border" style={{ backgroundColor: `${primary}0d`, borderColor: `${primary}22` }}>
+                  <span className="text-stone-600">{selected.length} {labels.service} انتخاب شده</span>
                   <span className="font-bold" style={{ color: primary }}>
                     {formatPrice(totalPrice)} · {totalDuration} دقیقه
                   </span>
@@ -545,7 +575,7 @@ export default function Book({ settings }) {
               <button
                 type="button"
                 disabled={!selected.length}
-                onClick={() => setStep(allowStaff ? 1 : 2)}
+                onClick={goAfterServices}
                 className="w-full py-4 rounded-2xl text-white font-bold disabled:opacity-40 shadow-lg"
                 style={{ backgroundColor: primary }}
               >
@@ -554,24 +584,34 @@ export default function Book({ settings }) {
             </div>
           )}
 
-          {step === 1 && allowStaff && (
+          {step === staffStep && allowStaff && (
             <div className="space-y-3">
-              <button type="button" onClick={() => { setStaffId(null); setStep(2); }} className="w-full p-4 border-2 border-dashed border-pink-200 rounded-2xl hover:bg-pink-50 font-medium">
-                🎯 هر پرسنل آزاد
-              </button>
-              {staff.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => { setStaffId(s.id); setStep(2); }}
-                  className="w-full p-4 border rounded-2xl text-right hover:border-pink-400 flex items-center gap-3"
-                >
-                  <span className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold" style={{ backgroundColor: s.color_hex || primary }}>
-                    {s.display_name?.charAt(0)}
-                  </span>
-                  {s.display_name}
+              {!staffRequired && (
+                <button type="button" onClick={() => { setStaffId(null); setStep(timeStep); }} className="w-full p-4 border-2 border-dashed rounded-2xl hover:bg-stone-50 font-medium" style={{ borderColor: `${primary}44` }}>
+                  هر {labels.staff_singular} آزاد
                 </button>
-              ))}
+              )}
+              {staff.length === 0 ? (
+                <p className="text-center text-stone-500 py-6">{labels.staff}ی برای این {labels.service} یافت نشد</p>
+              ) : (
+                staff.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { setStaffId(s.id); setStep(timeStep); }}
+                    className="w-full p-4 border rounded-2xl text-right hover:shadow-sm flex items-center gap-3 transition"
+                    style={staffId === s.id ? { borderColor: primary } : {}}
+                  >
+                    <span className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold" style={{ backgroundColor: s.color_hex || primary }}>
+                      {s.display_name?.charAt(0)}
+                    </span>
+                    {s.display_name}
+                  </button>
+                ))
+              )}
+              {staffRequired && !staffId && staff.length > 0 && (
+                <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">انتخاب {labels.staff_singular} الزامی است</p>
+              )}
               <button type="button" onClick={() => setStep(0)} className="inline-flex items-center gap-1 text-stone-500 text-sm hover:text-stone-700">
                 <ArrowRight className="w-4 h-4" />
                 بازگشت
@@ -579,7 +619,7 @@ export default function Book({ settings }) {
             </div>
           )}
 
-          {step === 2 && (
+          {step === timeStep && (
             <div>
               <label className="block text-sm font-medium text-stone-600 mb-2">انتخاب تاریخ</label>
               <MonthAvailabilityCalendar
@@ -589,12 +629,11 @@ export default function Book({ settings }) {
                 staffId={staffId}
                 onSelect={(g) => {
                   setDate(g);
-                  // پس از انتخاب روز، کاربر را به تایم‌ها ببریم
                   setTimeout(() => timesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
                 }}
               />
               {date && (
-                <p className="text-sm text-pink-700 font-medium mt-3">{formatJalaliDateLong(date + 'T12:00:00')}</p>
+                <p className="text-sm font-medium mt-3" style={{ color: primary }}>{formatJalaliDateLong(date + 'T12:00:00')}</p>
               )}
               <p className="text-sm text-stone-500 mb-4">مدت تقریبی: {totalDuration} دقیقه</p>
               <div ref={timesRef} />
@@ -608,8 +647,8 @@ export default function Book({ settings }) {
                     <button
                       key={sl.start + sl.staff_id}
                       type="button"
-                      onClick={() => { setSlot(sl); setStep(3); }}
-                      className="p-3 border-2 border-stone-100 rounded-xl text-sm hover:border-pink-400 hover:bg-pink-50 transition"
+                      onClick={() => { setSlot(sl); setStep(infoStep); }}
+                      className="p-3 border-2 border-stone-100 rounded-xl text-sm hover:shadow-sm transition"
                     >
                       <span className="font-semibold block">{formatJalaliTime(sl.start)}</span>
                       <span className="text-stone-400 text-xs">{sl.staff_name}</span>
@@ -617,14 +656,14 @@ export default function Book({ settings }) {
                   ))}
                 </div>
               )}
-              <button type="button" onClick={() => setStep(allowStaff ? 1 : 0)} className="mt-4 inline-flex items-center gap-1 text-stone-500 text-sm hover:text-stone-700">
+              <button type="button" onClick={() => setStep(allowStaff ? staffStep : 0)} className="mt-4 inline-flex items-center gap-1 text-stone-500 text-sm hover:text-stone-700">
                 <ArrowRight className="w-4 h-4" />
                 بازگشت
               </button>
             </div>
           )}
 
-          {step === 3 && (
+          {step === infoStep && (
             <div className="space-y-4">
               {!getToken() && (
                 <>
@@ -633,18 +672,22 @@ export default function Book({ settings }) {
                 </>
               )}
               <textarea placeholder="یادداشت (اختیاری)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full border-2 border-stone-100 rounded-2xl p-3" rows={3} />
-              <button type="button" onClick={() => setStep(4)} className="w-full py-4 rounded-2xl text-white font-bold" style={{ backgroundColor: primary }}>
+              <button type="button" onClick={() => setStep(confirmStep)} className="w-full py-4 rounded-2xl text-white font-bold" style={{ backgroundColor: primary }}>
                 بررسی نهایی
+              </button>
+              <button type="button" onClick={() => setStep(timeStep)} className="inline-flex items-center gap-1 text-stone-500 text-sm hover:text-stone-700">
+                <ArrowRight className="w-4 h-4" />
+                بازگشت
               </button>
             </div>
           )}
 
-          {step === 4 && slot && (
+          {step === confirmStep && slot && (
             <div>
               <div className="bg-stone-50 rounded-2xl p-5 space-y-2 text-sm mb-6">
                 <p><strong>زمان:</strong> {formatDateTime(slot.start)}</p>
-                <p><strong>پرسنل:</strong> {slot.staff_name}</p>
-                <p><strong>خدمات:</strong> {services.filter((s) => isSelected(s.id)).map((s) => s.name).join('، ')}</p>
+                <p><strong>{labels.staff_singular}:</strong> {slot.staff_name}</p>
+                <p><strong>{labels.services}:</strong> {services.filter((s) => isSelected(s.id)).map((s) => s.name).join('، ')}</p>
                 <p className="text-lg font-bold pt-2" style={{ color: primary }}>{formatPrice(totalPrice)}</p>
                 {depositEstimate > 0 && (
                   <p className="text-sm font-medium text-amber-700 bg-amber-50 rounded-xl px-3 py-2 mt-2">
@@ -681,7 +724,7 @@ export default function Book({ settings }) {
 
               {depositEstimate > 0 && payMethod === 'card' && cardOk && (
                 <div className="mb-4 rounded-2xl bg-stone-50 border border-stone-100 p-4 text-sm">
-                  <div className="font-semibold text-stone-800 mb-1">واریز به کارت سالن</div>
+                  <div className="font-semibold text-stone-800 mb-1">واریز به کارت {biz}</div>
                   <div className="font-bold tracking-wider text-stone-900" dir="ltr">{formatCardDisplay(settings.card_number)}</div>
                   {settings.card_holder && <div className="text-stone-500 mt-1">به نام {settings.card_holder}</div>}
                   <p className="text-xs text-stone-400 mt-2 leading-5">بعد از ثبت نوبت، فیش واریزی را آپلود کنید.</p>
@@ -696,6 +739,10 @@ export default function Book({ settings }) {
                       ? 'ثبت نوبت و ادامه واریز'
                       : 'تأیید و پرداخت بیعانه'
                     : 'تأیید و ثبت نوبت'}
+              </button>
+              <button type="button" onClick={() => setStep(infoStep)} className="mt-3 inline-flex items-center gap-1 text-stone-500 text-sm hover:text-stone-700">
+                <ArrowRight className="w-4 h-4" />
+                بازگشت
               </button>
             </div>
           )}

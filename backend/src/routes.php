@@ -79,6 +79,7 @@ return function (Router $router): void {
     $router->post('/api/v1/admin/staff/{id}/avatar', [AdminController::class, 'uploadStaffAvatar'], $staffAdmin);
 
     $router->get('/api/v1/admin/customers', [AdminController::class, 'customers'], $admin);
+    $router->patch('/api/v1/admin/customers/{id}', [AdminController::class, 'updateCustomer'], $admin);
     $router->get('/api/v1/admin/notifications', [AdminController::class, 'notifications'], $staffAdmin);
     $router->patch('/api/v1/admin/notifications/{id}/read', [AdminController::class, 'markNotificationRead'], $staffAdmin);
     $router->post('/api/v1/admin/notifications/read-all', [AdminController::class, 'markAllNotificationsRead'], $staffAdmin);

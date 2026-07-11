@@ -38,6 +38,7 @@ final class Migrator
         self::ensureColumn('platform_admins', 'is_active', 'TINYINT NOT NULL DEFAULT 1');
         self::ensureColumn('leads', 'priority', "VARCHAR(20) NOT NULL DEFAULT 'normal'");
         self::ensureColumn('sites', 'business_type', "VARCHAR(32) NOT NULL DEFAULT 'beauty_salon'");
+        self::ensureColumn('customers', 'national_id', 'VARCHAR(20) NULL');
     }
 
     private static function ensureColumn(string $table, string $column, string $definition): void

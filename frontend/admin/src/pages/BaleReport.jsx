@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Save, Send } from 'lucide-react';
 import { api } from '../../../shared/api';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 
 const field =
   'w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-100 text-sm';
 
 export default function BaleReport() {
+  const { labels } = useVertical();
   const [token, setToken] = useState('');
   const [chatId, setChatId] = useState('');
   const [enabled, setEnabled] = useState(false);
@@ -56,7 +58,7 @@ export default function BaleReport() {
 
       <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
         <p className="text-sm text-slate-500 leading-7">
-          گزارش روزانه‌ی عملکرد سالن (نوبت‌ها، درآمد و مشتری جدید) در پیام‌رسان بله برای شما ارسال می‌شود.
+          گزارش روزانه‌ی عملکرد {labels.business} ({labels.appointment}‌ها، درآمد و {labels.customer} جدید) در پیام‌رسان بله برای شما ارسال می‌شود.
           ابتدا از <b>@BotFather</b> در بله یک ربات بسازید، سپس توکن آن و شناسه‌ی چت خود را وارد کنید.
         </p>
 

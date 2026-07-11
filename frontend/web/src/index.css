@@ -8,6 +8,18 @@
   --color-accent: #f9a8d4;
 }
 
+html[data-business-type='dental_clinic'] {
+  --color-primary: #0e7490;
+  --color-secondary: #164e63;
+  --color-accent: #67e8f9;
+}
+
+html[data-business-type='medical_practice'] {
+  --color-primary: #3f6212;
+  --color-secondary: #1a2e05;
+  --color-accent: #bef264;
+}
+
 body {
   font-family: 'Vazirmatn', system-ui, sans-serif;
   @apply text-stone-800 antialiased;
@@ -19,7 +31,8 @@ body {
     @apply bg-white/10 backdrop-blur-xl border border-white/20;
   }
   .salon-card {
-    @apply bg-white rounded-3xl shadow-xl shadow-pink-900/5 border border-pink-50/80 transition-all duration-300 hover:shadow-2xl hover:shadow-pink-900/10 hover:-translate-y-1;
+    @apply bg-white rounded-3xl shadow-xl border border-stone-100/80 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1;
+    box-shadow: 0 20px 40px -20px color-mix(in srgb, var(--color-primary) 12%, transparent);
   }
   .animate-fade-up {
     animation: fadeUp 0.7s ease-out forwards;

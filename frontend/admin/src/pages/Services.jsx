@@ -3,11 +3,13 @@ import { Scissors, Pencil, Trash2, Plus } from 'lucide-react';
 import { api, formatPrice } from '../../../shared/api';
 import { getCategoryIconComponent } from '../../../shared/categoryIcons';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 import ServiceFormDrawer from '../components/ServiceFormDrawer';
 
 const empty = { name: '', description: '', duration_minutes: 30, price: 0, category_id: '', deposit_percent: 0, is_active: 1 };
 
 export default function Services() {
+  const { labels } = useVertical();
   const [data, setData] = useState({ categories: [], services: [] });
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
@@ -120,7 +122,7 @@ export default function Services() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">خدمات</h1>
-          <p className="text-slate-500 text-sm mt-1">مدیریت و دسته‌بندی خدمات سالن</p>
+          <p className="text-slate-500 text-sm mt-1">مدیریت و دسته‌بندی {labels.services}</p>
         </div>
         <button
           type="button"

@@ -24,6 +24,7 @@ import {
 } from '../../../shared/utils';
 import { STATUS_SELECT as STATUS_SELECT_CLASSES } from '../../../shared/statusStyles';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 import JalaliDateInput from '../components/JalaliDateInput';
 import StatusSelect from '../components/StatusSelect';
 import AppointmentDetailsModal from '../components/AppointmentDetailsModal';
@@ -36,6 +37,7 @@ const QUICK_FILTERS = [
 ];
 
 export default function Appointments() {
+  const { labels } = useVertical();
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState('');
   const [date, setDate] = useState('');
@@ -166,7 +168,7 @@ export default function Appointments() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">مدیریت نوبت‌ها</h1>
-        <p className="text-slate-500 text-sm mt-1">برنامه‌ریزی و پیگیری رزروهای سالن</p>
+        <p className="text-slate-500 text-sm mt-1">برنامه‌ریزی و پیگیری {labels.appointment}‌ها</p>
       </header>
 
       <div className="grid grid-cols-3 gap-4">

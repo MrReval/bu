@@ -20,14 +20,21 @@ final class AppointmentService
             throw new \InvalidArgumentException('رزرو آنلاین غیرفعال است');
         }
 
-        $rules = json_decode($settings['booking_rules_json'] ?? '{}', true);
-        $serviceIds = $data['service_ids'] ?? [];
+        $rules = json_decode($settings['booking_rules_json'] ?? '{}', true) ?: [];
+        $serviceIds = array_values(array_unique(array_map('intval', $data['service_ids'] ?? [])));
         $staffId = isset($data['staff_id']) ? (int) $data['staff_id'] : null;
         $startAt = $data['start_at'] ?? '';
         $notes = trim($data['notes_customer'] ?? '');
 
         if (empty($serviceIds) || $startAt === '') {
             throw new \InvalidArgumentException('خدمات و زمان الزامی است');
+        }
+
+        $multiService = array_key_exists('multi_service', $rules)
+            ? (bool) $rules['multi_service']
+            : true;
+        if (!$multiService && count($serviceIds) > 1) {
+            throw new \InvalidArgumentException('در این مجموعه فقط یک خدمت در هر نوبت مجاز است');
         }
 
         if (!$customerId) {
@@ -70,6 +77,10 @@ final class AppointmentService
 
         if (!$staffId && !empty($data['staff_id_from_slot'])) {
             $staffId = (int) $data['staff_id_from_slot'];
+        }
+
+        if (!empty($rules['staff_selection_required']) && !$staffId) {
+            throw new \InvalidArgumentException('انتخاب پرسنل / پزشک برای این نوبت الزامی است');
         }
 
         $autoConfirm = !empty($rules['auto_confirm']);

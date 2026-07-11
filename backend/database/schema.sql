@@ -262,6 +262,7 @@ CREATE TABLE IF NOT EXISTS customers (
     user_id INT PRIMARY KEY,
     notes TEXT,
     birth_date VARCHAR(20),
+    national_id VARCHAR(20) NULL,
     marketing_opt_in TINYINT NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

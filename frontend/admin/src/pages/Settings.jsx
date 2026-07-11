@@ -23,6 +23,7 @@ import { formatJalaliDate } from '../../../shared/jalali';
 import ImageUpload from '../components/ImageUpload';
 import { DAY_NAMES, normalizeBusinessHours, parseJson } from '../../../shared/utils';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 
 const DEFAULT_HOURS = Object.fromEntries(
   DAY_NAMES.map((_, i) => [
@@ -33,6 +34,7 @@ const DEFAULT_HOURS = Object.fromEntries(
 );
 
 export default function Settings() {
+  const { labels } = useVertical();
   const [s, setS] = useState(null);
   const [tab, setTab] = useState('general');
   const [loading, setLoading] = useState(true);
@@ -136,7 +138,7 @@ export default function Settings() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">تنظیمات سالن</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">تنظیمات {labels.business}</h1>
           <p className="text-slate-500 text-sm mt-1">پیکربندی اطلاعات، ظاهر سایت و قوانین رزرو</p>
         </div>
         <button
@@ -184,7 +186,7 @@ export default function Settings() {
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-slate-500 mb-2">نام سالن</label>
+                <label className="block text-xs font-medium text-slate-500 mb-2">نام {labels.business}</label>
                 <div className="relative">
                   <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -397,8 +399,8 @@ export default function Settings() {
 
               <label className="flex items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-2xl">
                 <div>
-                  <p className="font-semibold text-slate-800">انتخاب پرسنل توسط مشتری</p>
-                  <p className="text-xs text-slate-500 mt-0.5">اگر خاموش باشد، سیستم به صورت خودکار پرسنل را انتخاب می‌کند.</p>
+                  <p className="font-semibold text-slate-800">انتخاب {labels.staff_singular} توسط {labels.customer}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">اگر خاموش باشد، سیستم به صورت خودکار {labels.staff_singular} را انتخاب می‌کند.</p>
                 </div>
                 <input
                   type="checkbox"

@@ -17,6 +17,7 @@ import {
 import { api, formatPrice, mediaUrl } from '../../../shared/api';
 import { DAY_NAMES, getBusinessDayHours, normalizeBusinessHours, parseJson } from '../../../shared/utils';
 import { getCategoryIconComponent } from '../../../shared/categoryIcons';
+import { getLabels, getVerticalCopy, getVerticalFeatures } from '../../../shared/vertical';
 import heroDefault from '../assets/defaults/hero.jpg';
 import gallery1 from '../assets/defaults/gallery-1.jpg';
 import gallery2 from '../assets/defaults/gallery-2.jpg';
@@ -24,19 +25,6 @@ import gallery3 from '../assets/defaults/gallery-3.jpg';
 import gallery4 from '../assets/defaults/gallery-4.jpg';
 import gallery5 from '../assets/defaults/gallery-5.jpg';
 import gallery6 from '../assets/defaults/gallery-6.jpg';
-
-const DEFAULT_TESTIMONIALS = [
-  { name: 'سارا م.', text: 'بهترین مانیکور عمرم! محیط تمیز و برخورد عالی.', stars: 5 },
-  { name: 'نیلوفر ک.', text: 'کاشت ناخنم فوق‌العاده شد. حتماً دوباره میام.', stars: 5 },
-  { name: 'مریم ر.', text: 'رزرو آنلاین راحت بود و سر وقت نوبتم رو گرفتن.', stars: 5 },
-];
-
-
-const FEATURES = [
-  { icon: Award, title: 'کیفیت برتر', desc: 'استفاده از بهترین برندهای بین‌المللی' },
-  { icon: Clock, title: 'رزرو آسان', desc: 'نوبت‌دهی آنلاین ۲۴ ساعته' },
-  { icon: Gem, title: 'محیط لوکس', desc: 'فضایی آرام و بهداشتی برای آرامش شما' },
-];
 
 // عکس‌های پیش‌فرض دمو (هیرو و گالری) که در باندل قرار می‌گیرند و همیشه سرو می‌شوند
 const DEFAULT_HERO = heroDefault;
@@ -56,6 +44,15 @@ export default function Home({ settings }) {
   const [gallery, setGallery] = useState([]);
   const [activeCat, setActiveCat] = useState('all');
 
+  const labels = getLabels(settings);
+  const copy = getVerticalCopy(settings);
+  const vFeatures = getVerticalFeatures(settings);
+  const FEATURES = copy.features.map((f, i) => ({
+    ...f,
+    icon: [Award, Clock, Gem][i] || Award,
+  }));
+  const DEFAULT_TESTIMONIALS = copy.testimonials;
+
   const primary = settings.primary_color || '#9d174d';
   const secondary = settings.secondary_color || '#500724';
   const accent = settings.accent_color || '#f9a8d4';
@@ -68,8 +65,10 @@ export default function Home({ settings }) {
       setServices(d.services || []);
     });
     api('/staff').then(setTeam).catch(() => {});
-    api('/gallery').then(setGallery).catch(() => setGallery([]));
-  }, []);
+    if (vFeatures.gallery && (settings.features || []).includes('gallery')) {
+      api('/gallery').then(setGallery).catch(() => setGallery([]));
+    }
+  }, [vFeatures.gallery, settings.features]);
 
   const sectionConfig = (type) => sections.find((s) => s.type === type)?.config || {};
 
@@ -79,7 +78,9 @@ export default function Home({ settings }) {
     return active.filter((s) => String(s.category_id) === String(activeCat));
   }, [services, activeCat]);
 
-  const galleryImages = gallery.length > 0 ? gallery.map((g) => g.url) : DEFAULT_GALLERY;
+  const galleryImages = (vFeatures.gallery && gallery.length > 0)
+    ? gallery.map((g) => g.url)
+    : (vFeatures.gallery ? DEFAULT_GALLERY : []);
 
   const heroImage = mediaUrl(settings.hero_image) || DEFAULT_HERO;
 
@@ -114,13 +115,13 @@ export default function Home({ settings }) {
           <div className="text-white animate-fade-up min-w-0">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/25 text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4" />
-              سالن زیبایی لوکس
+              {copy.eyebrow}
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-bold leading-[1.15] mb-6 tracking-tight">
-              {settings.hero_title}
+              {settings.hero_title || labels.hero_title}
             </h1>
             <p className="text-base sm:text-lg text-white/90 leading-relaxed mb-8 sm:mb-10 max-w-xl">
-              {settings.hero_subtitle}
+              {settings.hero_subtitle || labels.hero_subtitle}
             </p>
             <div className="flex flex-col sm:flex-row flex-wrap gap-3">
               {settings.is_booking_enabled == 1 && (
@@ -130,22 +131,18 @@ export default function Home({ settings }) {
                   style={{ color: primary }}
                 >
                   <CalendarCheck className="w-5 h-5" />
-                  رزرو آنلاین نوبت
+                  {labels.book_cta}
                 </Link>
               )}
               <a
                 href="#services"
                 className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-8 py-4 rounded-2xl border-2 border-white/40 font-semibold hover:bg-white/10 transition"
               >
-                مشاهده خدمات
+                مشاهده {labels.services}
               </a>
             </div>
             <div className="grid grid-cols-3 gap-4 sm:gap-6 mt-10 sm:mt-14 pt-6 sm:pt-8 border-t border-white/20 max-w-md">
-              {[
-                { n: '۵۰۰+', l: 'مشتری راضی' },
-                { n: '۱۰+', l: 'سال تجربه' },
-                { n: '۱۵+', l: 'خدمت تخصصی' },
-              ].map((s) => (
+              {copy.stats.map((s) => (
                 <div key={s.l}>
                   <div className="text-xl sm:text-2xl font-bold leading-tight">{s.n}</div>
                   <div className="text-white/75 text-xs sm:text-sm mt-0.5 leading-snug">{s.l}</div>
@@ -220,10 +217,10 @@ export default function Home({ settings }) {
               خدمات ما
             </span>
             <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-stone-900">
-              {sectionConfig('services').title || 'خدمات تخصصی زیبایی'}
+              {sectionConfig('services').title || copy.services_fallback}
             </h2>
             <p className="text-stone-500 mt-3 max-w-xl mx-auto">
-              ناخن، مو، پوست، میک‌آپ، مژه، اصلاح و میکروبلیدینگ — همه در یک جا
+              {copy.services_sub}
             </p>
           </div>
 
@@ -322,15 +319,15 @@ export default function Home({ settings }) {
           </div>
           <div className="order-1 lg:order-2">
             <span className="text-sm font-semibold" style={{ color: primary }}>
-              {sectionConfig('about').title || 'درباره ما'}
+              {sectionConfig('about').title || labels.about_title}
             </span>
-            <h2 className="text-3xl font-bold mt-2 mb-6 text-stone-900">داستان سالن ما</h2>
+            <h2 className="text-3xl font-bold mt-2 mb-6 text-stone-900">{labels.about_title}</h2>
             <div
               className="text-stone-600 leading-loose prose prose-pink max-w-none"
               dangerouslySetInnerHTML={{
                 __html:
                   settings.about_html ||
-                  '<p>ما با عشق به زیبایی و سال‌ها تجربه، فضایی ساخته‌ایم که در آن هر مشتری احساس خاص بودن کند.</p>',
+                  `<p>${copy.about_fallback}</p>`,
               }}
             />
             <Link
@@ -338,7 +335,7 @@ export default function Home({ settings }) {
               className="inline-flex mt-8 items-center gap-2 px-7 py-3.5 rounded-2xl text-white font-semibold shadow-lg hover:shadow-xl transition"
               style={{ backgroundColor: primary }}
             >
-              همین حالا نوبت بگیرید
+              {labels.book_cta}
               <ArrowLeft className="w-5 h-5" />
             </Link>
           </div>
@@ -349,7 +346,7 @@ export default function Home({ settings }) {
         <section id="team" className="py-24 bg-stone-50">
           <div className="max-w-7xl mx-auto px-4">
             <div className="text-center mb-14">
-              <h2 className="text-3xl font-bold text-stone-900">تیم حرفه‌ای ما</h2>
+              <h2 className="text-3xl font-bold text-stone-900">{labels.staff}</h2>
               <p className="text-stone-500 mt-2">با هر متخصص آشنا شوید و نمونه کارها را ببینید</p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -383,7 +380,7 @@ export default function Home({ settings }) {
                     <h3 className="font-bold text-lg text-stone-900 group-hover:text-pink-700 transition">
                       {m.display_name}
                     </h3>
-                    <p className="text-stone-500 text-sm mt-1 line-clamp-2">{m.bio || 'متخصص زیبایی'}</p>
+                    <p className="text-stone-500 text-sm mt-1 line-clamp-2">{m.bio || labels.staff_singular}</p>
                     <div className="flex flex-wrap gap-3 mt-4 text-xs text-stone-600">
                       <span className="inline-flex items-center gap-1 bg-pink-50 text-pink-800 px-2 py-1 rounded-lg">
                         <Scissors className="w-3.5 h-3.5" />
@@ -402,10 +399,10 @@ export default function Home({ settings }) {
         </section>
       )}
 
-      {galleryImages.length > 0 && (
+      {vFeatures.gallery && galleryImages.length > 0 && (
         <section id="gallery" className="py-24 bg-stone-50">
           <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12 text-stone-900">گالری کارها</h2>
+            <h2 className="text-3xl font-bold text-center mb-12 text-stone-900">گالری</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {galleryImages.slice(0, 6).map((src, i) => (
                 <div
@@ -426,7 +423,7 @@ export default function Home({ settings }) {
 
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12 text-stone-900">نظر مشتریان</h2>
+          <h2 className="text-3xl font-bold text-center mb-12 text-stone-900">نظر {labels.customer === 'بیمار' ? 'بیماران' : 'مشتریان'}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t, i) => (
               <div key={i} className="salon-card p-8 relative">
@@ -473,10 +470,10 @@ export default function Home({ settings }) {
           style={{ backgroundColor: primary }}
         >
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-            {sectionConfig('cta').title || 'آماده‌اید زیباتر شوید؟'}
+            {sectionConfig('cta').title || copy.cta_title}
           </h2>
           <p className="text-white/85 mb-8 max-w-lg mx-auto">
-            همین الان نوبت خود را رزرو کنید و از تخفیف اولین مراجعه بهره‌مند شوید
+            {copy.cta_sub}
           </p>
           <Link
             to={sectionConfig('cta').button_link || '/book'}
@@ -484,7 +481,7 @@ export default function Home({ settings }) {
             style={{ color: primary }}
           >
             <CalendarCheck className="w-5 h-5" />
-            {sectionConfig('cta').button_text || 'رزرو آنلاین'}
+            {sectionConfig('cta').button_text || labels.book_cta}
           </Link>
         </div>
       </section>

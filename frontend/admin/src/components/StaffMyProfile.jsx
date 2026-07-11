@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Save, User } from 'lucide-react';
 import { api } from '../../../shared/api';
 import { useToast } from '../context/Toast';
+import { useVertical } from '../context/Vertical';
 import ImageUpload from './ImageUpload';
 import PortfolioUpload from './PortfolioUpload';
 
@@ -10,6 +11,8 @@ const inputClass =
 
 export default function StaffMyProfile({ staff, onSaved }) {
   const toast = useToast();
+  const { verticalFeatures } = useVertical();
+  const showPortfolio = verticalFeatures.staff_portfolio !== false;
   const [form, setForm] = useState({
     display_name: '',
     bio: '',
@@ -107,15 +110,17 @@ export default function StaffMyProfile({ staff, onSaved }) {
         </button>
       </div>
 
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-        <div className="mb-4">
-          <h2 className="font-bold text-slate-900">نمونه کارها</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            تصاویر کارهای خود را آپلود کنید و برای هر کدام توضیحات چندخطی بنویسید.
-          </p>
+      {showPortfolio && (
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          <div className="mb-4">
+            <h2 className="font-bold text-slate-900">نمونه کارها</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              تصاویر کارهای خود را آپلود کنید و برای هر کدام توضیحات چندخطی بنویسید.
+            </p>
+          </div>
+          <PortfolioUpload staffId={staff.id} multilineCaption />
         </div>
-        <PortfolioUpload staffId={staff.id} multilineCaption />
-      </div>
+      )}
     </form>
   );
 }

@@ -22,8 +22,10 @@ import {
   Send,
   Receipt,
 } from 'lucide-react';
-import { api, clearAuth, getUser } from '../../../shared/api';
+import { clearAuth, getUser } from '../../../shared/api';
 import { replaceGregorianDatesWithJalali } from '../../../shared/utils';
+import { useVertical } from '../context/Vertical';
+import { api } from '../../../shared/api';
 
 const NOTIFY_STORAGE_KEY = 'bu_admin_notified_ids_v1';
 
@@ -45,65 +47,64 @@ function saveNotifiedIds(ids) {
   }
 }
 
-const NAV = [
-  { to: '/', label: 'داشبورد', icon: LayoutDashboard },
-  { to: '/appointments', label: 'نوبت‌ها', icon: CalendarDays },
-  { to: '/notifications', label: 'اعلان‌ها', icon: Bell },
-  { to: '/services', label: 'خدمات', icon: Scissors, roles: ['super_admin', 'manager'] },
-  { to: '/staff', label: 'پرسنل', icon: Users, roles: ['super_admin', 'manager', 'staff'] },
-  { to: '/gallery', label: 'گالری سایت', icon: Image, roles: ['super_admin', 'manager'], feature: 'gallery' },
-  { to: '/customers', label: 'مشتریان', icon: UserCircle, roles: ['super_admin', 'manager'] },
-  { to: '/accounting', label: 'حسابداری', icon: BarChart3, roles: ['super_admin', 'manager'], feature: 'accounting' },
-  { to: '/club', label: 'باشگاه مشتریان', icon: Gift, roles: ['super_admin', 'manager'], feature: 'customer_club' },
-  { to: '/surveys', label: 'نظرسنجی‌ها', icon: Star, roles: ['super_admin', 'manager'], feature: 'survey' },
-  { to: '/qrcode', label: 'QR کد', icon: QrCode, roles: ['super_admin', 'manager'], feature: 'qrcode' },
-  { to: '/sms', label: 'پیامک', icon: MessageSquare, roles: ['super_admin', 'manager'], feature: 'sms' },
-  { to: '/payment', label: 'درگاه پرداخت', icon: CreditCard, roles: ['super_admin', 'manager'], feature: 'deposit' },
-  { to: '/deposit-receipts', label: 'فیش‌های بیعانه', icon: Receipt, roles: ['super_admin', 'manager'], feature: 'deposit' },
-  { to: '/bale', label: 'گزارش بله', icon: Send, roles: ['super_admin', 'manager'], feature: 'bale_report' },
-  { to: '/settings', label: 'تنظیمات', icon: Settings, roles: ['super_admin', 'manager'] },
-];
+function buildNav(labels) {
+  return [
+    { to: '/', label: 'داشبورد', icon: LayoutDashboard },
+    { to: '/appointments', label: `${labels.appointment}‌ها`, icon: CalendarDays },
+    { to: '/notifications', label: 'اعلان‌ها', icon: Bell },
+    { to: '/services', label: labels.services, icon: Scissors, roles: ['super_admin', 'manager'] },
+    { to: '/staff', label: labels.staff, icon: Users, roles: ['super_admin', 'manager', 'staff'] },
+    { to: '/gallery', label: 'گالری سایت', icon: Image, roles: ['super_admin', 'manager'], feature: 'gallery', vertical: 'gallery' },
+    { to: '/customers', label: `${labels.customer}ان`, icon: UserCircle, roles: ['super_admin', 'manager'] },
+    { to: '/accounting', label: 'حسابداری', icon: BarChart3, roles: ['super_admin', 'manager'], feature: 'accounting' },
+    { to: '/club', label: `باشگاه ${labels.customer}ان`, icon: Gift, roles: ['super_admin', 'manager'], feature: 'customer_club' },
+    { to: '/surveys', label: 'نظرسنجی‌ها', icon: Star, roles: ['super_admin', 'manager'], feature: 'survey' },
+    { to: '/qrcode', label: 'QR کد', icon: QrCode, roles: ['super_admin', 'manager'], feature: 'qrcode' },
+    { to: '/sms', label: 'پیامک', icon: MessageSquare, roles: ['super_admin', 'manager'], feature: 'sms' },
+    { to: '/payment', label: 'درگاه پرداخت', icon: CreditCard, roles: ['super_admin', 'manager'], feature: 'deposit' },
+    { to: '/deposit-receipts', label: 'فیش‌های بیعانه', icon: Receipt, roles: ['super_admin', 'manager'], feature: 'deposit' },
+    { to: '/bale', label: 'گزارش بله', icon: Send, roles: ['super_admin', 'manager'], feature: 'bale_report' },
+    { to: '/settings', label: 'تنظیمات', icon: Settings, roles: ['super_admin', 'manager'] },
+  ];
+}
 
-function NavLinks({ onNavigate, features }) {
+function NavLinks({ onNavigate, features, labels, verticalFeatures }) {
   const loc = useLocation();
   const user = getUser();
   const can = (roles) => !roles || roles.includes(user?.role);
   const hasFeature = (f) => !f || (Array.isArray(features) && features.includes(f));
+  const hasVertical = (v) => !v || verticalFeatures?.[v] !== false;
   const isActive = (to) => (to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to));
 
-  return NAV.filter((n) => can(n.roles) && hasFeature(n.feature)).map((n) => {
-    const Icon = n.icon;
-    const active = isActive(n.to);
-    return (
-      <Link
-        key={n.to}
-        to={n.to}
-        onClick={onNavigate}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-          active
-            ? 'bg-pink-600 text-white shadow-md shadow-pink-600/25'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-        }`}
-      >
-        <Icon className="w-5 h-5 shrink-0" strokeWidth={active ? 2.25 : 2} />
-        {n.to === '/staff' && user?.role === 'staff' ? 'پروفایل من' : n.label}
-      </Link>
-    );
-  });
+  return buildNav(labels)
+    .filter((n) => can(n.roles) && hasFeature(n.feature) && hasVertical(n.vertical))
+    .map((n) => {
+      const Icon = n.icon;
+      const active = isActive(n.to);
+      return (
+        <Link
+          key={n.to}
+          to={n.to}
+          onClick={onNavigate}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            active
+              ? 'bg-pink-600 text-white shadow-md shadow-pink-600/25'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          }`}
+        >
+          <Icon className="w-5 h-5 shrink-0" strokeWidth={active ? 2.25 : 2} />
+          {n.to === '/staff' && user?.role === 'staff' ? 'پروفایل من' : n.label}
+        </Link>
+      );
+    });
 }
 
 export default function Layout({ children }) {
   const user = getUser();
+  const { labels, features, verticalFeatures, settings } = useVertical();
   const [unread, setUnread] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [features, setFeatures] = useState(null);
   const loc = useLocation();
-
-  useEffect(() => {
-    api('/settings/public')
-      .then((s) => setFeatures(Array.isArray(s?.features) ? s.features : []))
-      .catch(() => setFeatures([]));
-  }, []);
   const notifiedIdsRef = useRef(loadNotifiedIds());
   const firstPollRef = useRef(true);
 
@@ -128,7 +129,6 @@ export default function Layout({ children }) {
           return;
         }
 
-        // جلوگیری از اسپم: در اولین Poll اعلان سیستم نمایش نده
         if (firstPollRef.current) {
           const ids = unreadList.map((n) => n.id);
           notifiedIdsRef.current = [...new Set([...notifiedIdsRef.current, ...ids])].slice(-100);
@@ -140,7 +140,6 @@ export default function Layout({ children }) {
         const newOnes = unreadList.filter((n) => !notifiedIdsRef.current.includes(n.id));
         if (newOnes.length === 0) return;
 
-        // حداکثر 3 اعلان در هر Poll (برای جلوگیری از انفجار اعلان‌ها)
         newOnes.slice(0, 3).forEach((n) => {
           try {
             const notif = new Notification(n.title || 'اعلان جدید', {
@@ -174,7 +173,7 @@ export default function Layout({ children }) {
   }, [loc.pathname]);
 
   return (
-    <div className="h-screen overflow-hidden lg:flex bg-slate-100">
+    <div className="h-screen overflow-hidden lg:flex bg-slate-100" data-business-type={settings?.business_type || 'beauty_salon'}>
       {sidebarOpen && (
         <button
           type="button"
@@ -195,14 +194,19 @@ export default function Layout({ children }) {
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-bold text-slate-900">پنل سالن</h1>
-              <p className="text-slate-400 text-xs">مدیریت زیبایی</p>
+              <h1 className="font-bold text-slate-900">{labels.panel || 'پنل مدیریت'}</h1>
+              <p className="text-slate-400 text-xs truncate max-w-[10rem]">{settings?.name || labels.business_full}</p>
             </div>
           </div>
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <NavLinks onNavigate={() => setSidebarOpen(false)} features={features} />
+          <NavLinks
+            onNavigate={() => setSidebarOpen(false)}
+            features={features}
+            labels={labels}
+            verticalFeatures={verticalFeatures}
+          />
         </nav>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50/80">
@@ -243,7 +247,7 @@ export default function Layout({ children }) {
           <button type="button" onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-700" aria-label="منو">
             <Menu className="w-6 h-6" />
           </button>
-          <span className="font-semibold text-slate-800">پنل مدیریت</span>
+          <span className="font-semibold text-slate-800">{labels.panel || 'پنل مدیریت'}</span>
           {unread > 0 ? (
             <span className="bg-pink-600 text-white text-xs min-w-[1.25rem] h-5 px-1.5 rounded-full flex items-center justify-center">{unread}</span>
           ) : (
