@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS packages (
     price_monthly BIGINT NOT NULL DEFAULT 0,
     price_yearly BIGINT NOT NULL DEFAULT 0,
     is_active TINYINT NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    business_type VARCHAR(32) NOT NULL DEFAULT 'beauty_salon',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_packages_business_type (business_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS package_features (
@@ -123,8 +125,8 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 
 CREATE TABLE IF NOT EXISTS salon_settings (
     site_id INT NOT NULL PRIMARY KEY,
-    name VARCHAR(191) NOT NULL DEFAULT 'سالن زیبایی',
-    slug VARCHAR(191) NOT NULL DEFAULT 'salon',
+    name VARCHAR(191) NOT NULL DEFAULT 'مجموعه',
+    slug VARCHAR(191) NOT NULL DEFAULT 'site',
     phone VARCHAR(30) DEFAULT '',
     address VARCHAR(255) DEFAULT '',
     timezone VARCHAR(60) NOT NULL DEFAULT 'Asia/Tehran',
@@ -134,8 +136,8 @@ CREATE TABLE IF NOT EXISTS salon_settings (
     secondary_color VARCHAR(20) NOT NULL DEFAULT '#831843',
     accent_color VARCHAR(20) NOT NULL DEFAULT '#f472b6',
     font_family VARCHAR(60) NOT NULL DEFAULT 'Vazirmatn',
-    hero_title VARCHAR(255) NOT NULL DEFAULT 'به سالن زیبایی ما خوش آمدید',
-    hero_subtitle VARCHAR(255) NOT NULL DEFAULT 'زیبایی شما، تخصص ما',
+    hero_title VARCHAR(255) NOT NULL DEFAULT '',
+    hero_subtitle VARCHAR(255) NOT NULL DEFAULT '',
     hero_image VARCHAR(255),
     about_html TEXT,
     social_links_json TEXT NOT NULL DEFAULT ('{}'),

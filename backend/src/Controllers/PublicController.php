@@ -51,6 +51,24 @@ final class PublicController
         $row['labels'] = $vertical['labels'];
         $row['vertical_features'] = $vertical['features'];
 
+        // اگر هیرو هنوز متن پیش‌فرض سالن است ولی قالب چیز دیگری است، از رجیستری جایگزین کن
+        $beautyHeroes = [
+            'به سالن زیبایی ما خوش آمدید',
+            'زیبایی، تخصص و تجربه‌ای خاص',
+            'زیبایی شما، تخصص ما',
+        ];
+        if ($businessType !== VerticalRegistry::BEAUTY) {
+            if ($row['hero_title'] === '' || in_array((string) $row['hero_title'], $beautyHeroes, true)) {
+                $row['hero_title'] = $vertical['labels']['hero_title'];
+            }
+            if ($row['hero_subtitle'] === '' || in_array((string) $row['hero_subtitle'], $beautyHeroes, true)) {
+                $row['hero_subtitle'] = $vertical['labels']['hero_subtitle'];
+            }
+        }
+        // لیبل‌های نمایشی هیرو: مقدار نهایی تنظیمات (پس از اصلاح بالا)
+        $row['labels']['hero_title'] = (string) ($row['hero_title'] ?: $vertical['labels']['hero_title']);
+        $row['labels']['hero_subtitle'] = (string) ($row['hero_subtitle'] ?: $vertical['labels']['hero_subtitle']);
+
         // آیا درگاه پرداخت فعال است (برای دریافت بیعانه)
         $pay = $pdo->prepare(
             'SELECT is_enabled, enamad_code, payment_mode, card_number, card_holder, zibal_merchant

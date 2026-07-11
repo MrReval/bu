@@ -39,6 +39,7 @@ final class Migrator
         self::ensureColumn('leads', 'priority', "VARCHAR(20) NOT NULL DEFAULT 'normal'");
         self::ensureColumn('sites', 'business_type', "VARCHAR(32) NOT NULL DEFAULT 'beauty_salon'");
         self::ensureColumn('customers', 'national_id', 'VARCHAR(20) NULL');
+        self::ensureColumn('packages', 'business_type', "VARCHAR(32) NOT NULL DEFAULT 'beauty_salon'");
     }
 
     private static function ensureColumn(string $table, string $column, string $definition): void
@@ -122,47 +123,91 @@ final class Migrator
         }
     }
 
-    /** ساخت پکیج‌های پیش‌فرض پلتفرم (idempotent) */
+    /** ساخت پکیج‌های پیش‌فرض پلتفرم — جدا برای هر صنف (idempotent) */
     public static function seedPackages(): void
     {
         $pdo = Connection::get();
+        self::ensureColumn('packages', 'business_type', "VARCHAR(32) NOT NULL DEFAULT 'beauty_salon'");
 
         $map = [];
         foreach ($pdo->query('SELECT id, feature_key FROM features')->fetchAll() as $f) {
             $map[$f['feature_key']] = (int) $f['id'];
         }
 
-        $pro = ['dashboard', 'multi_staff', 'booking', 'website', 'notifications', 'support'];
-        $plus = array_merge($pro, [
-            'unlimited_staff', 'staff_dashboard', 'seo', 'gallery', 'staff_portfolio',
-            'sms', 'deposit', 'accounting', 'customer_club', 'survey', 'qrcode', 'pwa',
-            'landing_builder', 'priority_support',
-        ]);
-        $professional = array_merge($plus, ['bale_report', 'vip_support', 'dev_priority']);
+        $core = ['dashboard', 'multi_staff', 'booking', 'website', 'notifications', 'support'];
+        $plusShared = [
+            'unlimited_staff', 'staff_dashboard', 'seo', 'sms', 'deposit', 'accounting',
+            'customer_club', 'survey', 'qrcode', 'pwa', 'landing_builder', 'priority_support',
+        ];
+        $proVip = ['bale_report', 'vip_support', 'dev_priority'];
 
-        // قیمت سالانه = ماهانه×۱۲ با ۱۵٪ تخفیف
-        $packages = [
-            ['پرو', 'مناسب سالن‌های کوچک', 2990000, 30498000, $pro],
-            ['پلاس', 'محبوب‌ترین پلن با امکانات کامل', 4990000, 50898000, $plus],
-            ['حرفه‌ای', 'حداکثر امکانات و پشتیبانی VIP', 6990000, 71298000, $professional],
+        // فیچرهای بصری مخصوص هر صنف
+        $byVertical = [
+            'beauty_salon' => [
+                'label' => 'سالن زیبایی',
+                'plus_extra' => ['gallery', 'staff_portfolio'],
+                'tiers' => [
+                    ['پرو سالن', 'مناسب سالن‌ها و آرایشگاه‌های کوچک', 2990000, 30498000],
+                    ['پلاس سالن', 'محبوب‌ترین پلن سالن با گالری و باشگاه مشتریان', 4990000, 50898000],
+                    ['حرفه‌ای سالن', 'حداکثر امکانات سالن و پشتیبانی VIP', 6990000, 71298000],
+                ],
+            ],
+            'dental_clinic' => [
+                'label' => 'کلینیک دندان',
+                'plus_extra' => ['gallery'],
+                'tiers' => [
+                    ['پرو دندان', 'مناسب مطب‌ها و کلینیک‌های کوچک دندان‌پزشکی', 2990000, 30498000],
+                    ['پلاس دندان', 'نوبت‌دهی، بیعانه و گالری کلینیک دندان', 4990000, 50898000],
+                    ['حرفه‌ای دندان', 'حداکثر امکانات کلینیک دندان و پشتیبانی VIP', 6990000, 71298000],
+                ],
+            ],
+            'medical_practice' => [
+                'label' => 'مطب پزشکی',
+                'plus_extra' => [],
+                'tiers' => [
+                    ['پرو مطب', 'مناسب مطب شخصی و تراپیست‌ها', 2990000, 30498000],
+                    ['پلاس مطب', 'نوبت‌دهی کامل، پیامک و باشگاه بیماران', 4990000, 50898000],
+                    ['حرفه‌ای مطب', 'حداکثر امکانات مطب و پشتیبانی VIP', 6990000, 71298000],
+                ],
+            ],
         ];
 
-        $check = $pdo->prepare('SELECT id FROM packages WHERE name = ?');
+        // پکیج‌های قدیمی عمومی را به سالن منتقل کن
+        $legacy = [
+            'پرو' => 'پرو سالن',
+            'پلاس' => 'پلاس سالن',
+            'حرفه‌ای' => 'حرفه‌ای سالن',
+        ];
+        foreach ($legacy as $old => $new) {
+            $pdo->prepare(
+                "UPDATE packages SET name = ?, business_type = 'beauty_salon', description = COALESCE(NULLIF(description, ''), ?)
+                 WHERE name = ? AND (business_type = '' OR business_type = 'beauty_salon' OR business_type IS NULL)"
+            )->execute([$new, 'مناسب سالن زیبایی', $old]);
+        }
+        $pdo->exec("UPDATE packages SET business_type = 'beauty_salon' WHERE business_type IS NULL OR business_type = ''");
+
+        $check = $pdo->prepare('SELECT id FROM packages WHERE name = ? AND business_type = ?');
         $insPkg = $pdo->prepare(
-            'INSERT INTO packages (name, description, price_monthly, price_yearly, is_active) VALUES (?,?,?,?,1)'
+            'INSERT INTO packages (name, description, price_monthly, price_yearly, is_active, business_type) VALUES (?,?,?,?,1,?)'
         );
         $insFeat = $pdo->prepare('INSERT INTO package_features (package_id, feature_id) VALUES (?, ?)');
 
-        foreach ($packages as [$name, $desc, $monthly, $yearly, $keys]) {
-            $check->execute([$name]);
-            if ($check->fetch()) {
-                continue;
-            }
-            $insPkg->execute([$name, $desc, $monthly, $yearly]);
-            $pkgId = (int) $pdo->lastInsertId();
-            foreach (array_unique($keys) as $k) {
-                if (isset($map[$k])) {
-                    $insFeat->execute([$pkgId, $map[$k]]);
+        foreach ($byVertical as $type => $meta) {
+            $plusKeys = array_merge($core, $plusShared, $meta['plus_extra']);
+            $proKeys = array_merge($plusKeys, $proVip);
+            $tierKeys = [$core, $plusKeys, $proKeys];
+
+            foreach ($meta['tiers'] as $i => [$name, $desc, $monthly, $yearly]) {
+                $check->execute([$name, $type]);
+                if ($check->fetch()) {
+                    continue;
+                }
+                $insPkg->execute([$name, $desc, $monthly, $yearly, $type]);
+                $pkgId = (int) $pdo->lastInsertId();
+                foreach (array_unique($tierKeys[$i]) as $k) {
+                    if (isset($map[$k])) {
+                        $insFeat->execute([$pkgId, $map[$k]]);
+                    }
                 }
             }
         }
@@ -189,10 +234,21 @@ final class Migrator
                 $vertical['labels']['hero_subtitle'],
             ]);
         } else {
+            // همگام‌سازی رنگ و هیرو با قالب (اگر هنوز پیش‌فرض سالن مانده باشد، جایگزین می‌شود)
             $pdo->prepare(
-                'UPDATE salon_settings SET primary_color = COALESCE(NULLIF(primary_color, ""), ?),
-                 secondary_color = COALESCE(NULLIF(secondary_color, ""), ?) WHERE site_id = ?'
-            )->execute([$vertical['primary_color'], $vertical['secondary_color'], $siteId]);
+                'UPDATE salon_settings SET
+                    primary_color = ?,
+                    secondary_color = ?,
+                    hero_title = ?,
+                    hero_subtitle = ?
+                 WHERE site_id = ?'
+            )->execute([
+                $vertical['primary_color'],
+                $vertical['secondary_color'],
+                $vertical['labels']['hero_title'],
+                $vertical['labels']['hero_subtitle'],
+                $siteId,
+            ]);
         }
 
         $hours = json_encode($vertical['hours'], JSON_UNESCAPED_UNICODE);
@@ -233,19 +289,20 @@ final class Migrator
             }
         }
 
-        // گالری فقط برای قالب‌هایی که فعال است
-        if (!empty($features['gallery'])) {
-            self::seedDefaultImages($siteId);
-        } else {
-            // فقط هیرو/لوگو اگر موجود باشد
-            self::seedDefaultImages($siteId);
-        }
+        self::seedDefaultImages($siteId, $businessType);
     }
 
-    /** مسیر پوشه‌ی عکس‌های دموی اولیه (import/uploads) */
-    private static function importUploadsDir(): string
+    /** مسیر پوشه‌ی عکس‌های دموی اولیه (import/uploads/{vertical} یا fallback عمومی) */
+    private static function importUploadsDir(?string $businessType = null): string
     {
-        return dirname(Config::basePath()) . '/import/uploads';
+        $base = dirname(Config::basePath()) . '/import/uploads';
+        if ($businessType) {
+            $typed = $base . '/' . \Salon\Tenant\VerticalRegistry::normalize($businessType);
+            if (is_dir($typed)) {
+                return $typed;
+            }
+        }
+        return $base;
     }
 
     /** کپی یک فایل دمو به فضای آپلود سایت و بازگرداندن مسیر عمومی */
@@ -283,18 +340,21 @@ final class Migrator
         return $out;
     }
 
-    /** عکس‌های پیش‌فرض سایت (هیرو/لوگو/گالری) */
-    public static function seedDefaultImages(int $siteId): void
+    /** عکس‌های پیش‌فرض سایت (هیرو/لوگو/گالری) بر اساس قالب */
+    public static function seedDefaultImages(int $siteId, string $businessType = 'beauty_salon'): void
     {
-        $base = self::importUploadsDir();
+        $businessType = \Salon\Tenant\VerticalRegistry::normalize($businessType);
+        $vertical = \Salon\Tenant\VerticalRegistry::get($businessType);
+        $base = self::importUploadsDir($businessType);
         if (!is_dir($base)) {
             return;
         }
         $pdo = Connection::get();
+        $wantGallery = !empty($vertical['features']['gallery']);
 
         $heroFiles = self::imageFiles($base . '/hero');
         if ($heroFiles) {
-            $check = $pdo->prepare("SELECT hero_image FROM salon_settings WHERE site_id = ?");
+            $check = $pdo->prepare('SELECT hero_image FROM salon_settings WHERE site_id = ?');
             $check->execute([$siteId]);
             if (!$check->fetchColumn()) {
                 $dest = self::copyDemoFile($heroFiles[0], $siteId, 'hero');
@@ -306,7 +366,7 @@ final class Migrator
 
         $logoFiles = self::imageFiles($base . '/logo');
         if ($logoFiles) {
-            $check = $pdo->prepare("SELECT logo_path FROM salon_settings WHERE site_id = ?");
+            $check = $pdo->prepare('SELECT logo_path FROM salon_settings WHERE site_id = ?');
             $check->execute([$siteId]);
             if (!$check->fetchColumn()) {
                 $dest = self::copyDemoFile($logoFiles[0], $siteId, 'logo');
@@ -316,26 +376,27 @@ final class Migrator
             }
         }
 
-        $galleryFiles = self::imageFiles($base . '/gallery');
-        if ($galleryFiles) {
-            $cnt = $pdo->prepare('SELECT COUNT(*) FROM gallery_images WHERE site_id = ?');
-            $cnt->execute([$siteId]);
-            if ((int) $cnt->fetchColumn() === 0) {
-                $ins = $pdo->prepare('INSERT INTO gallery_images (site_id, file_path, sort_order) VALUES (?,?,?)');
-                $order = 0;
-                foreach ($galleryFiles as $g) {
-                    $dest = self::copyDemoFile($g, $siteId, 'gallery');
-                    if ($dest) {
-                        $ins->execute([$siteId, $dest, $order++]);
+        if ($wantGallery) {
+            $galleryFiles = self::imageFiles($base . '/gallery');
+            if ($galleryFiles) {
+                $cnt = $pdo->prepare('SELECT COUNT(*) FROM gallery_images WHERE site_id = ?');
+                $cnt->execute([$siteId]);
+                if ((int) $cnt->fetchColumn() === 0) {
+                    $ins = $pdo->prepare('INSERT INTO gallery_images (site_id, file_path, sort_order) VALUES (?,?,?)');
+                    $order = 0;
+                    foreach ($galleryFiles as $g) {
+                        $dest = self::copyDemoFile($g, $siteId, 'gallery');
+                        if ($dest) {
+                            $ins->execute([$siteId, $dest, $order++]);
+                        }
                     }
                 }
             }
         }
 
-        // عکس پیش‌فرض برای خدمات (از مجموعه‌ی دموی موجود)
+        // عکس پیش‌فرض برای خدمات از همان قالب
         $pool = array_merge(
             self::imageFiles($base . '/gallery'),
-            self::imageFiles($base . '/portfolio/2'),
             self::imageFiles($base . '/hero')
         );
         if ($pool) {
@@ -358,15 +419,18 @@ final class Migrator
     }
 
     /** عکس آواتار و نمونه‌کار پیش‌فرض برای پرسنل تازه‌ساخته‌شده */
-    public static function seedStaffMedia(int $siteId, int $staffId): void
+    public static function seedStaffMedia(int $siteId, int $staffId, string $businessType = 'beauty_salon'): void
     {
-        $base = self::importUploadsDir();
-        if (!is_dir($base)) {
+        $businessType = \Salon\Tenant\VerticalRegistry::normalize($businessType);
+        $vertical = \Salon\Tenant\VerticalRegistry::get($businessType);
+        $base = self::importUploadsDir($businessType);
+        $fallback = self::importUploadsDir(null);
+        if (!is_dir($base) && !is_dir($fallback)) {
             return;
         }
         $pdo = Connection::get();
 
-        $avatars = self::imageFiles($base . '/avatars');
+        $avatars = array_merge(self::imageFiles($base . '/avatars'), self::imageFiles($fallback . '/avatars'));
         if ($avatars) {
             $dest = self::copyDemoFile($avatars[0], $siteId, 'avatars');
             if ($dest) {
@@ -374,10 +438,17 @@ final class Migrator
             }
         }
 
+        if (empty($vertical['features']['staff_portfolio'])) {
+            return;
+        }
+
         // نمونه‌کارها معمولاً در import/uploads/portfolio/<oldStaffId>/... هستند
         $portfolioFiles = [];
-        $portfolioRoot = $base . '/portfolio';
-        if (is_dir($portfolioRoot)) {
+        foreach ([$base, $fallback] as $root) {
+            $portfolioRoot = $root . '/portfolio';
+            if (!is_dir($portfolioRoot)) {
+                continue;
+            }
             foreach (scandir($portfolioRoot) as $sub) {
                 if ($sub === '.' || $sub === '..') {
                     continue;

@@ -67,7 +67,7 @@ final class SiteService
             $staffId = (int) $pdo->lastInsertId();
 
             // آواتار و نمونه‌کار پیش‌فرض برای پرسنل مدیر
-            Migrator::seedStaffMedia($siteId, $staffId);
+            Migrator::seedStaffMedia($siteId, $staffId, $businessType);
 
             $svcStmt = $pdo->prepare('SELECT id FROM services WHERE site_id = ?');
             $svcStmt->execute([$siteId]);

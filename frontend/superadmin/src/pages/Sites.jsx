@@ -235,7 +235,7 @@ export default function Sites() {
                     key={v.key}
                     type="button"
                     disabled={!!editing}
-                    onClick={() => setForm({ ...form, business_type: v.key })}
+                    onClick={() => setForm({ ...form, business_type: v.key, package_id: '' })}
                     className={`text-right p-3 rounded-xl border transition ${
                       active ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-200' : 'border-slate-200 hover:bg-slate-50'
                     } ${editing ? 'opacity-70 cursor-not-allowed' : ''}`}
@@ -281,11 +281,16 @@ export default function Sites() {
           )}
 
           <div>
-            <label className="block text-sm text-slate-600 mb-1">پکیج اشتراک</label>
+            <label className="block text-sm text-slate-600 mb-1">پکیج اشتراک ({TYPE_LABEL[form.business_type] || 'صنف'})</label>
             <select className={field} value={form.package_id} onChange={(e) => setForm({ ...form, package_id: e.target.value })}>
               <option value="">بدون پکیج (همه امکانات)</option>
-              {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {packages
+                .filter((p) => !p.business_type || p.business_type === form.business_type)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
             </select>
+            <p className="text-[11px] text-slate-400 mt-1">فقط پکیج‌های همان صنف نمایش داده می‌شود.</p>
           </div>
 
           {editing ? (

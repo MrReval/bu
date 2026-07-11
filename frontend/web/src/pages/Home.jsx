@@ -18,18 +18,49 @@ import { api, formatPrice, mediaUrl } from '../../../shared/api';
 import { DAY_NAMES, getBusinessDayHours, normalizeBusinessHours, parseJson } from '../../../shared/utils';
 import { getCategoryIconComponent } from '../../../shared/categoryIcons';
 import { getLabels, getVerticalCopy, getVerticalFeatures } from '../../../shared/vertical';
-import heroDefault from '../assets/defaults/hero.jpg';
-import gallery1 from '../assets/defaults/gallery-1.jpg';
-import gallery2 from '../assets/defaults/gallery-2.jpg';
-import gallery3 from '../assets/defaults/gallery-3.jpg';
-import gallery4 from '../assets/defaults/gallery-4.jpg';
-import gallery5 from '../assets/defaults/gallery-5.jpg';
-import gallery6 from '../assets/defaults/gallery-6.jpg';
+import beautyHero from '../assets/defaults/beauty_salon/hero.jpg';
+import beautyG1 from '../assets/defaults/beauty_salon/gallery-1.jpg';
+import beautyG2 from '../assets/defaults/beauty_salon/gallery-2.jpg';
+import beautyG3 from '../assets/defaults/beauty_salon/gallery-3.jpg';
+import beautyG4 from '../assets/defaults/beauty_salon/gallery-4.jpg';
+import beautyG5 from '../assets/defaults/beauty_salon/gallery-5.jpg';
+import beautyG6 from '../assets/defaults/beauty_salon/gallery-6.jpg';
+import dentalHero from '../assets/defaults/dental_clinic/hero.jpg';
+import dentalG1 from '../assets/defaults/dental_clinic/gallery-1.jpg';
+import dentalG2 from '../assets/defaults/dental_clinic/gallery-2.jpg';
+import dentalG3 from '../assets/defaults/dental_clinic/gallery-3.jpg';
+import dentalG4 from '../assets/defaults/dental_clinic/gallery-4.jpg';
+import dentalG5 from '../assets/defaults/dental_clinic/gallery-5.jpg';
+import dentalG6 from '../assets/defaults/dental_clinic/gallery-6.jpg';
+import medicalHero from '../assets/defaults/medical_practice/hero.jpg';
+import medicalG1 from '../assets/defaults/medical_practice/gallery-1.jpg';
+import medicalG2 from '../assets/defaults/medical_practice/gallery-2.jpg';
+import medicalG3 from '../assets/defaults/medical_practice/gallery-3.jpg';
+import medicalG4 from '../assets/defaults/medical_practice/gallery-4.jpg';
+import medicalG5 from '../assets/defaults/medical_practice/gallery-5.jpg';
+import medicalG6 from '../assets/defaults/medical_practice/gallery-6.jpg';
 
-// عکس‌های پیش‌فرض دمو (هیرو و گالری) که در باندل قرار می‌گیرند و همیشه سرو می‌شوند
-const DEFAULT_HERO = heroDefault;
-const DEFAULT_ABOUT = gallery2;
-const DEFAULT_GALLERY = [gallery1, gallery2, gallery3, gallery4, gallery5, gallery6];
+const VERTICAL_ASSETS = {
+  beauty_salon: {
+    hero: beautyHero,
+    about: beautyG2,
+    gallery: [beautyG1, beautyG2, beautyG3, beautyG4, beautyG5, beautyG6],
+  },
+  dental_clinic: {
+    hero: dentalHero,
+    about: dentalG2,
+    gallery: [dentalG1, dentalG2, dentalG3, dentalG4, dentalG5, dentalG6],
+  },
+  medical_practice: {
+    hero: medicalHero,
+    about: medicalG2,
+    gallery: [medicalG1, medicalG2, medicalG3, medicalG4, medicalG5, medicalG6],
+  },
+};
+
+function getDefaultAssets(businessType) {
+  return VERTICAL_ASSETS[businessType] || VERTICAL_ASSETS.beauty_salon;
+}
 
 function CategoryIcon({ name, className = 'w-6 h-6' }) {
   const Icon = getCategoryIconComponent(name);
@@ -47,6 +78,7 @@ export default function Home({ settings }) {
   const labels = getLabels(settings);
   const copy = getVerticalCopy(settings);
   const vFeatures = getVerticalFeatures(settings);
+  const defaults = getDefaultAssets(settings.business_type);
   const FEATURES = copy.features.map((f, i) => ({
     ...f,
     icon: [Award, Clock, Gem][i] || Award,
@@ -80,9 +112,9 @@ export default function Home({ settings }) {
 
   const galleryImages = (vFeatures.gallery && gallery.length > 0)
     ? gallery.map((g) => g.url)
-    : (vFeatures.gallery ? DEFAULT_GALLERY : []);
+    : (vFeatures.gallery ? defaults.gallery : []);
 
-  const heroImage = mediaUrl(settings.hero_image) || DEFAULT_HERO;
+  const heroImage = mediaUrl(settings.hero_image) || defaults.hero;
 
   const testimonials = sectionConfig('testimonials').items?.length
     ? sectionConfig('testimonials').items
@@ -118,10 +150,10 @@ export default function Home({ settings }) {
               {copy.eyebrow}
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-bold leading-[1.15] mb-6 tracking-tight">
-              {settings.hero_title || labels.hero_title}
+              {labels.hero_title || settings.hero_title}
             </h1>
             <p className="text-base sm:text-lg text-white/90 leading-relaxed mb-8 sm:mb-10 max-w-xl">
-              {settings.hero_subtitle || labels.hero_subtitle}
+              {labels.hero_subtitle || settings.hero_subtitle}
             </p>
             <div className="flex flex-col sm:flex-row flex-wrap gap-3">
               {settings.is_booking_enabled == 1 && (
@@ -308,7 +340,7 @@ export default function Home({ settings }) {
         <div className="max-w-7xl mx-auto px-4 grid lg:grid-cols-2 gap-16 items-center">
           <div className="relative order-2 lg:order-1">
             <img
-              src={mediaUrl(settings.hero_image) || DEFAULT_ABOUT}
+              src={mediaUrl(settings.hero_image) || defaults.about}
               alt=""
               className="rounded-3xl shadow-xl w-full aspect-square object-cover"
             />

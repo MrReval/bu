@@ -17,7 +17,8 @@ final class PackageController
 
     public static function index(Request $req): void
     {
-        Response::json(PackageService::all());
+        $type = $req->query['business_type'] ?? null;
+        Response::json(PackageService::all($type !== null && $type !== '' ? (string) $type : null));
     }
 
     public static function store(Request $req): void
