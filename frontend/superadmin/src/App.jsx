@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Sites from './pages/Sites';
 import Packages from './pages/Packages';
+import Leads from './pages/Leads';
 import Sms from './pages/Sms';
 import Monitoring from './pages/Monitoring';
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/sites" element={<Sites />} />
         <Route path="/packages" element={<Packages />} />
+        <Route path="/leads" element={<Leads />} />
         <Route path="/sms" element={<Sms />} />
         <Route path="/monitoring" element={<Monitoring />} />
       </Route>

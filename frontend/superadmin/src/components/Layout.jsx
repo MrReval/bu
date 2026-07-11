@@ -6,6 +6,7 @@ import {
   Package,
   MessageSquare,
   Activity,
+  Target,
   LogOut,
   ShieldCheck,
   Menu,
@@ -17,6 +18,7 @@ const nav = [
   { to: '/', label: 'داشبورد', icon: LayoutDashboard, end: true },
   { to: '/sites', label: 'وب‌سایت‌ها', icon: Globe },
   { to: '/packages', label: 'پکیج‌ها', icon: Package },
+  { to: '/leads', label: 'سرنخ‌ها', icon: Target },
   { to: '/sms', label: 'پیامک', icon: MessageSquare },
   { to: '/monitoring', label: 'مانیتورینگ', icon: Activity },
 ];
@@ -24,6 +26,7 @@ const nav = [
 const titleFor = (path) => {
   if (path.startsWith('/sites')) return 'وب‌سایت‌ها';
   if (path.startsWith('/packages')) return 'پکیج‌ها';
+  if (path.startsWith('/leads')) return 'سرنخ‌ها';
   if (path.startsWith('/sms')) return 'پیامک';
   if (path.startsWith('/monitoring')) return 'مانیتورینگ';
   return 'داشبورد';
@@ -126,7 +129,7 @@ export default function Layout() {
           <span className="font-semibold text-slate-800">{titleFor(loc.pathname)}</span>
           <span className="w-6" />
         </header>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
           <Outlet />
         </main>
       </div>

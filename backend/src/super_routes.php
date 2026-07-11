@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Salon\Controllers\SuperAdmin\AuthController;
 use Salon\Controllers\SuperAdmin\DashboardController;
+use Salon\Controllers\SuperAdmin\LeadController;
 use Salon\Controllers\SuperAdmin\MonitoringController;
 use Salon\Controllers\SuperAdmin\PackageController;
 use Salon\Controllers\SuperAdmin\SiteController;
@@ -34,6 +35,12 @@ return function (Router $router): void {
     $router->get('/api/v1/super/sms', [SmsController::class, 'get'], $platform);
     $router->patch('/api/v1/super/sms', [SmsController::class, 'update'], $platform);
     $router->post('/api/v1/super/sms/test', [SmsController::class, 'test'], $platform);
+
+    // سرنخ‌های فروش
+    $router->get('/api/v1/super/leads', [LeadController::class, 'index'], $platform);
+    $router->post('/api/v1/super/leads', [LeadController::class, 'store'], $platform);
+    $router->patch('/api/v1/super/leads/{id}', [LeadController::class, 'update'], $platform);
+    $router->delete('/api/v1/super/leads/{id}', [LeadController::class, 'destroy'], $platform);
 
     // مانیتورینگ و لاگ فنی
     $router->get('/api/v1/super/system', [MonitoringController::class, 'system'], $platform);
