@@ -13,6 +13,7 @@ import Customers from './pages/Customers';
 import Notifications from './pages/Notifications';
 import SmsSettings from './pages/SmsSettings';
 import PaymentSettings from './pages/PaymentSettings';
+import DepositReceipts from './pages/DepositReceipts';
 import Accounting from './pages/Accounting';
 import CustomerClub from './pages/CustomerClub';
 import Surveys from './pages/Surveys';
@@ -52,6 +53,7 @@ export default function App() {
                   <Route path="/qrcode" element={<QrCode />} />
                   <Route path="/sms" element={<SmsSettings />} />
                   <Route path="/payment" element={<PaymentSettings />} />
+                  <Route path="/deposit-receipts" element={<DepositReceipts />} />
                   <Route path="/bale" element={<BaleReport />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>

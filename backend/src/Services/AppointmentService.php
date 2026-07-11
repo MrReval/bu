@@ -73,7 +73,8 @@ final class AppointmentService
         }
 
         $autoConfirm = !empty($rules['auto_confirm']);
-        $status = $autoConfirm ? 'confirmed' : 'pending';
+        // تا وقتی بیعانه پرداخت/تأیید نشده، نوبت نهایی نشود
+        $status = ($depositAmount > 0) ? 'pending' : ($autoConfirm ? 'confirmed' : 'pending');
 
         $pdo->beginTransaction();
         try {

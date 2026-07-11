@@ -350,7 +350,10 @@ CREATE TABLE IF NOT EXISTS site_sms_settings (
 CREATE TABLE IF NOT EXISTS site_payment_settings (
     site_id INT NOT NULL PRIMARY KEY,
     provider VARCHAR(30) NOT NULL DEFAULT 'zibal',
+    payment_mode VARCHAR(20) NOT NULL DEFAULT 'zibal',
     zibal_merchant VARCHAR(191) NOT NULL DEFAULT '',
+    card_number VARCHAR(32) NOT NULL DEFAULT '',
+    card_holder VARCHAR(150) NOT NULL DEFAULT '',
     enamad_code TEXT,
     is_enabled TINYINT NOT NULL DEFAULT 0,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -365,11 +368,14 @@ CREATE TABLE IF NOT EXISTS payments (
     provider VARCHAR(30) NOT NULL DEFAULT 'zibal',
     track_id VARCHAR(100) NULL,
     ref_number VARCHAR(100) NULL,
+    receipt_path VARCHAR(255) NULL,
+    admin_note TEXT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_payments_site (site_id),
     KEY idx_payments_track (track_id),
+    KEY idx_payments_status (status),
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

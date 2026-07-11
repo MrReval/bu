@@ -42,11 +42,22 @@ final class PublicController
         $row['features'] = FeatureGate::enabledKeys();
 
         // آیا درگاه پرداخت فعال است (برای دریافت بیعانه)
-        $pay = $pdo->prepare('SELECT is_enabled, enamad_code FROM site_payment_settings WHERE site_id = ?');
+        $pay = $pdo->prepare(
+            'SELECT is_enabled, enamad_code, payment_mode, card_number, card_holder, zibal_merchant
+             FROM site_payment_settings WHERE site_id = ?'
+        );
         $pay->execute([$sid]);
         $payRow = $pay->fetch() ?: [];
         $payEnabled = (bool) ($payRow['is_enabled'] ?? false) && FeatureGate::has('deposit');
+        $mode = (string) ($payRow['payment_mode'] ?? 'zibal');
         $row['payment_enabled'] = $payEnabled;
+        $row['payment_mode'] = $payEnabled ? $mode : null;
+        $row['zibal_enabled'] = $payEnabled && in_array($mode, ['zibal', 'both'], true)
+            && trim((string) ($payRow['zibal_merchant'] ?? '')) !== '';
+        $row['card_enabled'] = $payEnabled && in_array($mode, ['card', 'both'], true)
+            && trim((string) ($payRow['card_number'] ?? '')) !== '';
+        $row['card_number'] = $row['card_enabled'] ? (string) ($payRow['card_number'] ?? '') : '';
+        $row['card_holder'] = $row['card_enabled'] ? (string) ($payRow['card_holder'] ?? '') : '';
         // کد نماد اعتماد الکترونیکی فقط وقتی درگاه فعال است در فوتر نمایش داده می‌شود
         $row['enamad_code'] = $payEnabled ? (string) ($payRow['enamad_code'] ?? '') : '';
 

@@ -20,6 +20,7 @@ import {
   Star,
   QrCode,
   Send,
+  Receipt,
 } from 'lucide-react';
 import { api, clearAuth, getUser } from '../../../shared/api';
 import { replaceGregorianDatesWithJalali } from '../../../shared/utils';
@@ -58,6 +59,7 @@ const NAV = [
   { to: '/qrcode', label: 'QR کد', icon: QrCode, roles: ['super_admin', 'manager'], feature: 'qrcode' },
   { to: '/sms', label: 'پیامک', icon: MessageSquare, roles: ['super_admin', 'manager'], feature: 'sms' },
   { to: '/payment', label: 'درگاه پرداخت', icon: CreditCard, roles: ['super_admin', 'manager'], feature: 'deposit' },
+  { to: '/deposit-receipts', label: 'فیش‌های بیعانه', icon: Receipt, roles: ['super_admin', 'manager'], feature: 'deposit' },
   { to: '/bale', label: 'گزارش بله', icon: Send, roles: ['super_admin', 'manager'], feature: 'bale_report' },
   { to: '/settings', label: 'تنظیمات', icon: Settings, roles: ['super_admin', 'manager'] },
 ];

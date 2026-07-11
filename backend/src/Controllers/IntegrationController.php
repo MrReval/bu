@@ -70,7 +70,7 @@ final class IntegrationController
         Response::json($result);
     }
 
-    // ── درگاه پرداخت (زیبال) ─────────────────────────────────────────────
+    // ── درگاه پرداخت ─────────────────────────────────────────────────────
     public static function getPayment(Request $req): void
     {
         FeatureGate::require('deposit');
@@ -95,19 +95,38 @@ final class IntegrationController
         $isEnabled = !empty($b['is_enabled']);
         $enamad = trim((string) ($b['enamad_code'] ?? ''));
         $merchant = trim((string) ($b['zibal_merchant'] ?? ''));
+        $cardNumber = preg_replace('/\s+/', '', trim((string) ($b['card_number'] ?? ''))) ?? '';
+        $cardHolder = trim((string) ($b['card_holder'] ?? ''));
+        $mode = (string) ($b['payment_mode'] ?? 'zibal');
+        if (!in_array($mode, ['zibal', 'card', 'both'], true)) {
+            $mode = 'zibal';
+        }
 
         if ($isEnabled && $enamad === '') {
             Response::error('برای فعال‌سازی دریافت بیعانه، وارد کردن کد نماد اعتماد الکترونیکی (اینماد) الزامی است');
         }
-        if ($isEnabled && $merchant === '') {
-            Response::error('برای فعال‌سازی دریافت بیعانه، مرچنت زیبال الزامی است');
+        if ($isEnabled && in_array($mode, ['zibal', 'both'], true) && $merchant === '') {
+            Response::error('برای درگاه زیبال، مرچنت الزامی است');
+        }
+        if ($isEnabled && in_array($mode, ['card', 'both'], true)) {
+            if ($cardNumber === '' || !preg_match('/^\d{16}$/', $cardNumber)) {
+                Response::error('شماره کارت ۱۶ رقمی معتبر وارد کنید');
+            }
+            if ($cardHolder === '') {
+                Response::error('نام صاحب کارت الزامی است');
+            }
         }
 
         Connection::get()->prepare(
-            'UPDATE site_payment_settings SET provider=?, zibal_merchant=?, enamad_code=?, is_enabled=?, updated_at=NOW() WHERE site_id=?'
+            'UPDATE site_payment_settings
+             SET provider=?, payment_mode=?, zibal_merchant=?, card_number=?, card_holder=?, enamad_code=?, is_enabled=?, updated_at=NOW()
+             WHERE site_id=?'
         )->execute([
-            'zibal',
+            $mode === 'card' ? 'card' : 'zibal',
+            $mode,
             $merchant,
+            $cardNumber,
+            $cardHolder,
             $enamad,
             (int) $isEnabled,
             $sid,

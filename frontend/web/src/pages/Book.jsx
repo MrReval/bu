@@ -3,11 +3,16 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, formatPrice, formatDateTime, getToken, getUser } from '../../../shared/api';
 import { formatJalaliDateLong, formatJalaliTime, parseJson } from '../../../shared/utils';
 import { getCategoryIconComponent } from '../../../shared/categoryIcons';
-import { ArrowRight, Calendar, CheckCircle2, ChevronDown, Clock, Home, Scissors, User } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle2, ChevronDown, Clock, Copy, CreditCard, Home, Landmark, Scissors, Upload, User, Wallet } from 'lucide-react';
 import { todayGregorian } from '../../../shared/jalali';
 import MonthAvailabilityCalendar from '../components/MonthAvailabilityCalendar';
 
 const STEPS = ['خدمات', 'پرسنل', 'زمان', 'اطلاعات', 'تأیید'];
+
+function formatCardDisplay(num) {
+  const d = String(num || '').replace(/\D/g, '');
+  return d.replace(/(\d{4})(?=\d)/g, '$1-');
+}
 
 export default function Book({ settings }) {
   const [searchParams] = useSearchParams();
@@ -27,6 +32,11 @@ export default function Book({ settings }) {
   const [submitting, setSubmitting] = useState(false);
   const [openSections, setOpenSections] = useState(() => new Set());
   const timesRef = useRef(null);
+  const [payMethod, setPayMethod] = useState('zibal'); // zibal | card
+  const [cardPay, setCardPay] = useState(null); // { appointment, amount }
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const primary = settings.primary_color || '#9d174d';
   const secondary = settings.secondary_color || '#500724';
@@ -117,6 +127,15 @@ export default function Book({ settings }) {
         )
       : 0;
 
+  const zibalOk = Boolean(settings.zibal_enabled);
+  const cardOk = Boolean(settings.card_enabled);
+  const bothPay = zibalOk && cardOk;
+
+  useEffect(() => {
+    if (cardOk && !zibalOk) setPayMethod('card');
+    else if (zibalOk && !cardOk) setPayMethod('zibal');
+  }, [cardOk, zibalOk]);
+
   const submit = async () => {
     setError('');
     setSubmitting(true);
@@ -136,9 +155,15 @@ export default function Book({ settings }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // اگر بیعانه لازم است و درگاه فعال است، به زیبال هدایت شود
       const depositAmount = Number(data.deposit_amount || 0);
-      if (settings.payment_enabled && depositAmount > 0 && data.deposit_status === 'pending') {
+      const needsDeposit = settings.payment_enabled && depositAmount > 0 && data.deposit_status === 'pending';
+
+      if (needsDeposit && payMethod === 'card' && cardOk) {
+        setCardPay({ appointment: data, amount: depositAmount });
+        return;
+      }
+
+      if (needsDeposit && payMethod === 'zibal' && zibalOk) {
         try {
           const pay = await fetch(`/api/v1/payments/deposit/${data.id}`, { method: 'POST', headers });
           const payData = await pay.json();
@@ -158,10 +183,133 @@ export default function Book({ settings }) {
     }
   };
 
+  const copyCard = async () => {
+    try {
+      await navigator.clipboard.writeText(String(settings.card_number || '').replace(/\D/g, ''));
+    } catch {
+      // ignore
+    }
+  };
+
+  const onPickReceipt = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setReceiptFile(file);
+    setReceiptPreview(URL.createObjectURL(file));
+  };
+
+  const submitReceipt = async () => {
+    if (!cardPay?.appointment?.id) return;
+    if (!receiptFile) {
+      setError('لطفاً تصویر فیش واریزی را انتخاب کنید');
+      return;
+    }
+    setError('');
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('receipt', receiptFile);
+      const headers = {};
+      const token = getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/v1/payments/card/${cardPay.appointment.id}`, {
+        method: 'POST',
+        headers,
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'خطا در ارسال فیش');
+      setDone({
+        ...cardPay.appointment,
+        deposit_status: 'awaiting_review',
+        status: 'pending',
+        _receiptSent: true,
+      });
+      setCardPay(null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (cardPay) {
+    const amount = cardPay.amount;
+    return (
+      <div className="min-h-[72vh] px-4 py-10 sm:py-16 bg-gradient-to-b from-stone-50 via-white to-pink-50/30">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mb-3">
+              <Landmark size={26} />
+            </div>
+            <h1 className="text-xl font-bold text-stone-900">پرداخت بیعانه کارت‌به‌کارت</h1>
+            <p className="text-sm text-stone-500 mt-2 leading-relaxed">
+              مبلغ بیعانه را به کارت زیر واریز کنید و تصویر فیش را ارسال کنید. پس از تأیید سالن، نوبت نهایی می‌شود.
+            </p>
+          </div>
+
+          <div className="rounded-3xl bg-white border border-stone-100 shadow-sm p-5 space-y-4 mb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-stone-500">مبلغ بیعانه</span>
+              <span className="text-lg font-extrabold" style={{ color: primary }}>{formatPrice(amount)}</span>
+            </div>
+            <div className="rounded-2xl bg-stone-50 p-4">
+              <div className="text-xs text-stone-400 mb-1">شماره کارت</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-stone-900 tracking-wider text-lg" dir="ltr">
+                  {formatCardDisplay(settings.card_number)}
+                </span>
+                <button type="button" onClick={copyCard} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-stone-200 text-xs font-semibold text-stone-600">
+                  <Copy size={13} /> کپی
+                </button>
+              </div>
+              {settings.card_holder && (
+                <div className="mt-2 text-sm text-stone-600">
+                  به نام: <strong>{settings.card_holder}</strong>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-2">تصویر فیش واریزی *</label>
+              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-stone-200 rounded-2xl p-6 cursor-pointer hover:border-pink-300 hover:bg-pink-50/30 transition">
+                {receiptPreview ? (
+                  <img src={receiptPreview} alt="فیش" className="max-h-48 rounded-xl object-contain" />
+                ) : (
+                  <>
+                    <Upload className="text-stone-400" size={28} />
+                    <span className="text-sm text-stone-500">انتخاب عکس فیش (JPG/PNG)</span>
+                  </>
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={onPickReceipt} />
+              </label>
+            </div>
+          </div>
+
+          {error && <p className="text-rose-600 text-sm mb-3 text-center">{error}</p>}
+
+          <button
+            type="button"
+            disabled={uploading || !receiptFile}
+            onClick={submitReceipt}
+            className="w-full py-4 rounded-2xl text-white font-bold disabled:opacity-50"
+            style={{ backgroundColor: primary }}
+          >
+            {uploading ? 'در حال ارسال فیش...' : 'ارسال فیش و انتظار تأیید'}
+          </button>
+          <p className="text-xs text-stone-400 text-center mt-3 leading-5">
+            نوبت شما ثبت شده (# {cardPay.appointment.id}) ولی تا تأیید فیش نهایی نمی‌شود.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (done) {
     const staffName = done.services?.[0]?.staff_name || slot?.staff_name;
     const serviceNames = (done.services || []).map((s) => s.service_name).filter(Boolean);
-    const isConfirmed = done.status === 'confirmed';
+    const isConfirmed = done.status === 'confirmed' && done.deposit_status !== 'awaiting_review';
+    const waitingReceipt = done.deposit_status === 'awaiting_review' || done._receiptSent;
     const loggedIn = Boolean(getToken());
 
     return (
@@ -172,15 +320,17 @@ export default function Book({ settings }) {
               className="w-[72px] h-[72px] mx-auto rounded-full flex items-center justify-center ring-8 ring-emerald-50"
               style={{ backgroundColor: `${primary}12` }}
             >
-              <CheckCircle2 className="w-9 h-9 text-emerald-600" strokeWidth={1.75} />
+              <CheckCircle2 className={`w-9 h-9 ${waitingReceipt ? 'text-amber-600' : 'text-emerald-600'}`} strokeWidth={1.75} />
             </div>
             <h1 className="text-2xl sm:text-[1.75rem] font-bold text-stone-900 mt-6 tracking-tight">
-              نوبت شما ثبت شد
+              {waitingReceipt ? 'فیش ارسال شد' : 'نوبت شما ثبت شد'}
             </h1>
             <p className="text-stone-500 text-sm mt-2 leading-relaxed max-w-sm mx-auto">
-              {isConfirmed
-                ? 'نوبت تأیید شد. در زمان مقرر منتظر دیدار شما هستیم.'
-                : 'درخواست شما ثبت شد و پس از تأیید سالن، وضعیت نهایی اعلام می‌شود.'}
+              {waitingReceipt
+                ? 'فیش بیعانه برای مدیر سالن ارسال شد. پس از تأیید، نوبت شما نهایی می‌شود.'
+                : isConfirmed
+                  ? 'نوبت تأیید شد. در زمان مقرر منتظر دیدار شما هستیم.'
+                  : 'درخواست شما ثبت شد و پس از تأیید سالن، وضعیت نهایی اعلام می‌شود.'}
             </p>
           </div>
 
@@ -239,11 +389,15 @@ export default function Book({ settings }) {
           <div className="mt-4 flex justify-center">
             <span
               className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full ${
-                isConfirmed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
+                waitingReceipt
+                  ? 'bg-amber-50 text-amber-800'
+                  : isConfirmed
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-800'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${isConfirmed ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              {isConfirmed ? 'تأیید شده' : 'در انتظار تأیید سالن'}
+              <span className={`w-1.5 h-1.5 rounded-full ${isConfirmed && !waitingReceipt ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              {waitingReceipt ? 'در انتظار تأیید فیش' : isConfirmed ? 'تأیید شده' : 'در انتظار تأیید سالن'}
             </span>
           </div>
 
@@ -494,12 +648,54 @@ export default function Book({ settings }) {
                 <p className="text-lg font-bold pt-2" style={{ color: primary }}>{formatPrice(totalPrice)}</p>
                 {depositEstimate > 0 && (
                   <p className="text-sm font-medium text-amber-700 bg-amber-50 rounded-xl px-3 py-2 mt-2">
-                    بیعانه قابل پرداخت آنلاین: {formatPrice(depositEstimate)}
+                    بیعانه: {formatPrice(depositEstimate)}
+                    {payMethod === 'card' && cardOk ? ' — کارت‌به‌کارت' : payMethod === 'zibal' && zibalOk ? ' — پرداخت آنلاین' : ''}
                   </p>
                 )}
               </div>
+
+              {depositEstimate > 0 && bothPay && (
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setPayMethod('zibal')}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border text-sm font-semibold transition ${
+                      payMethod === 'zibal' ? 'border-pink-400 bg-pink-50 text-pink-800' : 'border-stone-200 text-stone-600'
+                    }`}
+                  >
+                    <Wallet size={18} />
+                    پرداخت آنلاین
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayMethod('card')}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border text-sm font-semibold transition ${
+                      payMethod === 'card' ? 'border-pink-400 bg-pink-50 text-pink-800' : 'border-stone-200 text-stone-600'
+                    }`}
+                  >
+                    <CreditCard size={18} />
+                    کارت‌به‌کارت
+                  </button>
+                </div>
+              )}
+
+              {depositEstimate > 0 && payMethod === 'card' && cardOk && (
+                <div className="mb-4 rounded-2xl bg-stone-50 border border-stone-100 p-4 text-sm">
+                  <div className="font-semibold text-stone-800 mb-1">واریز به کارت سالن</div>
+                  <div className="font-bold tracking-wider text-stone-900" dir="ltr">{formatCardDisplay(settings.card_number)}</div>
+                  {settings.card_holder && <div className="text-stone-500 mt-1">به نام {settings.card_holder}</div>}
+                  <p className="text-xs text-stone-400 mt-2 leading-5">بعد از ثبت نوبت، فیش واریزی را آپلود کنید.</p>
+                </div>
+              )}
+
               <button type="button" disabled={submitting} onClick={submit} className="w-full py-4 rounded-2xl text-white font-bold disabled:opacity-60" style={{ backgroundColor: primary }}>
-                {submitting ? 'در حال ثبت...' : depositEstimate > 0 ? 'تأیید و پرداخت بیعانه' : 'تأیید و ثبت نوبت'}
+                {submitting
+                  ? 'در حال ثبت...'
+                  : depositEstimate > 0
+                    ? payMethod === 'card'
+                      ? 'ثبت نوبت و ادامه واریز'
+                      : 'تأیید و پرداخت بیعانه'
+                    : 'تأیید و ثبت نوبت'}
               </button>
             </div>
           )}

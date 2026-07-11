@@ -26,6 +26,11 @@ final class Migrator
     private static function ensureColumns(): void
     {
         self::ensureColumn('site_payment_settings', 'enamad_code', 'TEXT NULL AFTER zibal_merchant');
+        self::ensureColumn('site_payment_settings', 'payment_mode', "VARCHAR(20) NOT NULL DEFAULT 'zibal'");
+        self::ensureColumn('site_payment_settings', 'card_number', "VARCHAR(32) NOT NULL DEFAULT ''");
+        self::ensureColumn('site_payment_settings', 'card_holder', "VARCHAR(150) NOT NULL DEFAULT ''");
+        self::ensureColumn('payments', 'receipt_path', 'VARCHAR(255) NULL');
+        self::ensureColumn('payments', 'admin_note', 'TEXT NULL');
         self::ensureColumn('salon_settings', 'bale_token', "VARCHAR(255) NOT NULL DEFAULT ''");
         self::ensureColumn('salon_settings', 'bale_chat_id', "VARCHAR(100) NOT NULL DEFAULT ''");
         self::ensureColumn('salon_settings', 'bale_daily_enabled', 'TINYINT NOT NULL DEFAULT 0');

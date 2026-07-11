@@ -33,6 +33,7 @@ return function (Router $router): void {
 
     // پرداخت بیعانه (زیبال)
     $router->post('/api/v1/payments/deposit/{id}', [PaymentController::class, 'startDeposit']);
+    $router->post('/api/v1/payments/card/{id}', [PaymentController::class, 'submitCardReceipt']);
     $router->get('/api/v1/payments/callback', [PaymentController::class, 'callback']);
 
     // نظرسنجی پس از خدمات (عمومی، با توکن امضاشده)
@@ -92,6 +93,9 @@ return function (Router $router): void {
     $router->post('/api/v1/admin/sms/test', [IntegrationController::class, 'testSms'], $admin);
     $router->get('/api/v1/admin/payment', [IntegrationController::class, 'getPayment'], $admin);
     $router->patch('/api/v1/admin/payment', [IntegrationController::class, 'updatePayment'], $admin);
+    $router->get('/api/v1/admin/payments/card', [PaymentController::class, 'adminList'], $admin);
+    $router->post('/api/v1/admin/payments/{id}/approve', [PaymentController::class, 'approve'], $admin);
+    $router->post('/api/v1/admin/payments/{id}/reject', [PaymentController::class, 'reject'], $admin);
 
     // حسابداری و گزارش درآمد
     $router->get('/api/v1/admin/accounting/summary', [AccountingController::class, 'summary'], $admin);

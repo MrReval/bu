@@ -55,6 +55,33 @@ final class NotificationService
         }
     }
 
+    public static function notifyManagersDepositReceipt(int $appointmentId, int $paymentId): void
+    {
+        $pdo = Connection::get();
+        $stmt = $pdo->prepare(
+            "SELECT id FROM users WHERE site_id = ? AND role IN ('super_admin','manager')"
+        );
+        $stmt->execute([TenantContext::siteId()]);
+        $users = $stmt->fetchAll();
+        try {
+            $apt = AppointmentService::getById($appointmentId);
+            $name = $apt['customer_name'] ?? 'مشتری';
+            $amount = number_format((float) ($apt['deposit_amount'] ?? 0));
+        } catch (\Throwable) {
+            $name = 'مشتری';
+            $amount = '—';
+        }
+        foreach ($users as $u) {
+            self::create(
+                (int) $u['id'],
+                'deposit_receipt',
+                'فیش بیعانه جدید',
+                sprintf('فیش کارت‌به‌کارت از %s به مبلغ %s تومان — نیاز به تأیید', $name, $amount),
+                ['appointment_id' => $appointmentId, 'payment_id' => $paymentId]
+            );
+        }
+    }
+
     public static function notifyCustomerStatus(int $appointmentId, int $customerId, string $status): void
     {
         $labels = [
