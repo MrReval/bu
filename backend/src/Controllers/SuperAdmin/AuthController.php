@@ -23,10 +23,6 @@ final class AuthController
 
     public static function me(Request $req): void
     {
-        Response::json(['admin' => [
-            'id' => (int) $req->user['id'],
-            'name' => $req->user['name'],
-            'email' => $req->user['email'],
-        ]]);
+        Response::json(['admin' => PlatformAuthService::publicAdmin($req->user)]);
     }
 }

@@ -3,7 +3,7 @@ import {
   Plus, Pencil, Trash2, Phone, Search, Filter, MessageCircle,
   UserRound, Building2, Flame, Clock, CheckCircle2, Ban, Target,
 } from 'lucide-react';
-import { api, formatDate } from '../api';
+import { api, formatDate, getAdmin, isSuperAdmin } from '../api';
 import { useToast } from '../context/Toast';
 import Modal from '../components/Modal';
 import JalaliDateInput from '../components/JalaliDateInput';
@@ -112,7 +112,11 @@ export default function Leads() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm);
+    const me = getAdmin();
+    setForm({
+      ...emptyForm,
+      employee_name: !isSuperAdmin() ? (me?.name || '') : '',
+    });
     setModalOpen(true);
   };
 
@@ -446,12 +450,15 @@ export default function Leads() {
                 onChange={(e) => setForm({ ...form, employee_name: e.target.value })}
                 className={field}
                 placeholder="نام کارمند"
+                readOnly={!isSuperAdmin()}
               />
-              <datalist id="lead-employees">
-                {employees.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
+              {isSuperAdmin() && (
+                <datalist id="lead-employees">
+                  {employees.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              )}
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">وضعیت</label>

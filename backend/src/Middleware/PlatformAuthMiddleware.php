@@ -25,6 +25,9 @@ final class PlatformAuthMiddleware
         if (!$admin) {
             Response::error('توکن نامعتبر', 401);
         }
+        if (!(int) ($admin['is_active'] ?? 1)) {
+            Response::error('این حساب غیرفعال است', 401);
+        }
         return $request->withUser($admin);
     }
 }

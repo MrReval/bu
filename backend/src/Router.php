@@ -8,11 +8,15 @@ use Salon\Http\Request;
 use Salon\Http\Response;
 use Salon\Middleware\AuthMiddleware;
 use Salon\Middleware\PlatformAuthMiddleware;
+use Salon\Services\PlatformAuthService;
 
 final class Router
 {
-    /** نشانگر مسیرهای نیازمند احراز هویت سوپرادمین پلتفرم */
+    /** نشانگر مسیرهای نیازمند احراز هویت سوپرادمین پلتفرم (هر نقش) */
     public const PLATFORM = '@platform';
+
+    /** فقط سوپرادمین کامل (نه کارمند) */
+    public const PLATFORM_SUPER = '@platform_super';
 
     /** @var array<string, array<string, callable>> */
     private array $routes = [];
@@ -62,10 +66,14 @@ final class Router
             }
 
             $req = $request;
-            if ($route['roles'] === [self::PLATFORM]) {
+            $roles = $route['roles'];
+            if ($roles === [self::PLATFORM] || $roles === [self::PLATFORM_SUPER]) {
                 $req = PlatformAuthMiddleware::handle($request);
-            } elseif ($route['roles'] !== null) {
-                $req = AuthMiddleware::handle($request, $route['roles']);
+                if ($roles === [self::PLATFORM_SUPER] && !PlatformAuthService::isSuper($req->user)) {
+                    Response::error('دسترسی مجاز نیست', 403);
+                }
+            } elseif ($roles !== null) {
+                $req = AuthMiddleware::handle($request, $roles);
             }
 
             ($route['handler'])($req, $params);

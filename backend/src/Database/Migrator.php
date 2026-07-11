@@ -29,6 +29,8 @@ final class Migrator
         self::ensureColumn('salon_settings', 'bale_token', "VARCHAR(255) NOT NULL DEFAULT ''");
         self::ensureColumn('salon_settings', 'bale_chat_id', "VARCHAR(100) NOT NULL DEFAULT ''");
         self::ensureColumn('salon_settings', 'bale_daily_enabled', 'TINYINT NOT NULL DEFAULT 0');
+        self::ensureColumn('platform_admins', 'role', "VARCHAR(30) NOT NULL DEFAULT 'super_admin'");
+        self::ensureColumn('platform_admins', 'is_active', 'TINYINT NOT NULL DEFAULT 1');
     }
 
     private static function ensureColumn(string $table, string $column, string $definition): void

@@ -24,7 +24,14 @@ final class LeadController
     {
         try {
             $createdBy = isset($req->user['id']) ? (int) $req->user['id'] : null;
-            Response::json(LeadService::create($req->body, $createdBy), 201);
+            $body = $req->body;
+            // برای کارمند، نام خودش به‌عنوان ثبت‌کننده ست می‌شود
+            if (($req->user['role'] ?? '') === 'employee') {
+                $body['employee_name'] = trim((string) ($body['employee_name'] ?? '')) !== ''
+                    ? $body['employee_name']
+                    : (string) ($req->user['name'] ?? '');
+            }
+            Response::json(LeadService::create($body, $createdBy), 201);
         } catch (\InvalidArgumentException $e) {
             Response::error($e->getMessage());
         }

@@ -22,6 +22,15 @@ export function getAdmin() {
   }
 }
 
+export function isSuperAdmin() {
+  const a = getAdmin();
+  return !a || a.role !== 'employee';
+}
+
+export function homePathForRole() {
+  return isSuperAdmin() ? '/' : '/leads';
+}
+
 export async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   const token = getToken();

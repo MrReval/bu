@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -7,26 +7,29 @@ import {
   MessageSquare,
   Activity,
   Target,
+  Users,
   LogOut,
   ShieldCheck,
   Menu,
   X,
 } from 'lucide-react';
-import { clearAuth, getAdmin } from '../api';
+import { clearAuth, getAdmin, isSuperAdmin } from '../api';
 
-const nav = [
-  { to: '/', label: 'داشبورد', icon: LayoutDashboard, end: true },
-  { to: '/sites', label: 'وب‌سایت‌ها', icon: Globe },
-  { to: '/packages', label: 'پکیج‌ها', icon: Package },
-  { to: '/leads', label: 'سرنخ‌ها', icon: Target },
-  { to: '/sms', label: 'پیامک', icon: MessageSquare },
-  { to: '/monitoring', label: 'مانیتورینگ', icon: Activity },
+const allNav = [
+  { to: '/', label: 'داشبورد', icon: LayoutDashboard, end: true, superOnly: true },
+  { to: '/sites', label: 'وب‌سایت‌ها', icon: Globe, superOnly: true },
+  { to: '/packages', label: 'پکیج‌ها', icon: Package, superOnly: true },
+  { to: '/leads', label: 'سرنخ‌ها', icon: Target, superOnly: false },
+  { to: '/staff', label: 'اکانت‌ها', icon: Users, superOnly: true },
+  { to: '/sms', label: 'پیامک', icon: MessageSquare, superOnly: true },
+  { to: '/monitoring', label: 'مانیتورینگ', icon: Activity, superOnly: true },
 ];
 
 const titleFor = (path) => {
   if (path.startsWith('/sites')) return 'وب‌سایت‌ها';
   if (path.startsWith('/packages')) return 'پکیج‌ها';
   if (path.startsWith('/leads')) return 'سرنخ‌ها';
+  if (path.startsWith('/staff')) return 'اکانت‌ها';
   if (path.startsWith('/sms')) return 'پیامک';
   if (path.startsWith('/monitoring')) return 'مانیتورینگ';
   return 'داشبورد';
@@ -36,7 +39,13 @@ export default function Layout() {
   const navigate = useNavigate();
   const loc = useLocation();
   const admin = getAdmin();
+  const superUser = isSuperAdmin();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const nav = useMemo(
+    () => allNav.filter((item) => superUser || !item.superOnly),
+    [superUser],
+  );
 
   const logout = () => {
     clearAuth();
@@ -64,7 +73,9 @@ export default function Layout() {
             <ShieldCheck className="text-brand-500" size={26} />
             <div>
               <div className="font-extrabold text-lg leading-tight">پلتفرم سالن</div>
-              <div className="text-xs text-slate-400">پنل سوپرادمین</div>
+              <div className="text-xs text-slate-400">
+                {superUser ? 'پنل سوپرادمین' : 'پنل کارمند'}
+              </div>
             </div>
           </div>
           <button
@@ -102,8 +113,10 @@ export default function Layout() {
               {(admin?.name || admin?.email || '?').charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-100 truncate">{admin?.name || 'سوپرادمین'}</p>
-              <p className="text-xs text-slate-400 truncate" dir="ltr">{admin?.email}</p>
+              <p className="text-sm font-semibold text-slate-100 truncate">{admin?.name || 'کاربر'}</p>
+              <p className="text-xs text-slate-400 truncate">
+                {superUser ? 'سوپرادمین' : 'کارمند'} · <span dir="ltr">{admin?.email}</span>
+              </p>
             </div>
           </div>
           <button

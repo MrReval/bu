@@ -23,8 +23,11 @@ CREATE TABLE IF NOT EXISTS platform_admins (
     name VARCHAR(191) NOT NULL,
     email VARCHAR(191) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'super_admin',
+    is_active TINYINT NOT NULL DEFAULT 1,
     last_login_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_platform_admins_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS platform_tokens (

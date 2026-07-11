@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
-import { api, setAuth } from '../api';
+import { api, setAuth, homePathForRole } from '../api';
 import { useToast } from '../context/Toast';
 
 export default function Login() {
@@ -20,7 +20,7 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
       setAuth(data);
-      navigate('/', { replace: true });
+      navigate(homePathForRole(), { replace: true });
     } catch (err) {
       show(err.message, 'error');
     } finally {
@@ -38,8 +38,8 @@ export default function Login() {
           <div className="w-14 h-14 rounded-2xl bg-brand-600 flex items-center justify-center mb-3">
             <ShieldCheck className="text-white" size={28} />
           </div>
-          <h1 className="text-xl font-extrabold text-slate-800">ورود سوپرادمین</h1>
-          <p className="text-sm text-slate-400 mt-1">مدیریت کل پلتفرم</p>
+          <h1 className="text-xl font-extrabold text-slate-800">ورود به پنل</h1>
+          <p className="text-sm text-slate-400 mt-1">سوپرادمین و کارمندان فروش</p>
         </div>
         <label className="block text-sm font-medium text-slate-600 mb-1">ایمیل</label>
         <input
