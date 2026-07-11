@@ -52,6 +52,9 @@ return function (Router $router): void {
     // سرنخ‌ها: سوپرادمین و کارمند
     $router->get('/api/v1/super/leads', [LeadController::class, 'index'], $platform);
     $router->post('/api/v1/super/leads', [LeadController::class, 'store'], $platform);
+    $router->post('/api/v1/super/leads/bulk', [LeadController::class, 'bulk'], $platform);
     $router->patch('/api/v1/super/leads/{id}', [LeadController::class, 'update'], $platform);
+    $router->post('/api/v1/super/leads/{id}/outcome', [LeadController::class, 'outcome'], $platform);
+    $router->get('/api/v1/super/leads/{id}/activities', [LeadController::class, 'activities'], $platform);
     $router->delete('/api/v1/super/leads/{id}', [LeadController::class, 'destroy'], $platform);
 };

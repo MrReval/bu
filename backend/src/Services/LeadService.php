@@ -18,13 +18,24 @@ final class LeadService
         'converted',
     ];
 
-    public static function counts(): array
+    public const PRIORITIES = ['low', 'normal', 'high'];
+
+    public static function counts(?string $mineEmployee = null): array
     {
         $pdo = Connection::get();
-        $rows = $pdo->query(
-            'SELECT status, COUNT(*) AS cnt FROM leads GROUP BY status'
-        )->fetchAll();
-        $out = ['all' => 0];
+        $params = [];
+        $mineSql = '';
+        if ($mineEmployee !== null && $mineEmployee !== '') {
+            $mineSql = ' AND employee_name = ?';
+            $params[] = $mineEmployee;
+        }
+
+        $sql = 'SELECT status, COUNT(*) AS cnt FROM leads WHERE 1=1' . $mineSql . ' GROUP BY status';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $out = ['all' => 0, 'mine' => 0, 'high' => 0];
         foreach (self::STATUSES as $s) {
             $out[$s] = 0;
         }
@@ -34,13 +45,67 @@ final class LeadService
             $out[$st] = $c;
             $out['all'] += $c;
         }
-        $out['follow_due'] = (int) $pdo->query(
-            "SELECT COUNT(*) FROM leads
+
+        $followParams = $params;
+        $followSql = "SELECT COUNT(*) FROM leads
              WHERE status IN ('follow_up','whatsapp','no_answer','interested')
                AND next_follow_up_at IS NOT NULL
-               AND next_follow_up_at <= NOW()"
-        )->fetchColumn();
+               AND next_follow_up_at <= NOW()" . $mineSql;
+        $fs = $pdo->prepare($followSql);
+        $fs->execute($followParams);
+        $out['follow_due'] = (int) $fs->fetchColumn();
+
+        $highSql = "SELECT COUNT(*) FROM leads WHERE priority = 'high' AND status NOT IN ('burned','converted')" . $mineSql;
+        $hs = $pdo->prepare($highSql);
+        $hs->execute($params);
+        $out['high'] = (int) $hs->fetchColumn();
+
         return $out;
+    }
+
+    public static function salesStats(?string $mineEmployee = null): array
+    {
+        $pdo = Connection::get();
+        $mineSql = '';
+        $params = [];
+        if ($mineEmployee) {
+            $mineSql = ' AND employee_name = ?';
+            $params[] = $mineEmployee;
+        }
+
+        $q = static function (string $sql, array $p) use ($pdo) {
+            $st = $pdo->prepare($sql);
+            $st->execute($p);
+            return (int) $st->fetchColumn();
+        };
+
+        $newToday = $q('SELECT COUNT(*) FROM leads WHERE DATE(created_at) = CURDATE()' . $mineSql, $params);
+        $contactedToday = $q(
+            'SELECT COUNT(*) FROM leads WHERE DATE(last_contacted_at) = CURDATE()' . $mineSql,
+            $params
+        );
+        $convertedWeek = $q(
+            "SELECT COUNT(*) FROM leads WHERE status = 'converted' AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)" . $mineSql,
+            $params
+        );
+        $activitiesToday = $q(
+            'SELECT COUNT(*) FROM lead_activities a
+             JOIN leads l ON l.id = a.lead_id
+             WHERE DATE(a.created_at) = CURDATE()' . ($mineEmployee ? ' AND l.employee_name = ?' : ''),
+            $params
+        );
+        $interestedOpen = $q(
+            "SELECT COUNT(*) FROM leads WHERE status = 'interested'" . $mineSql,
+            $params
+        );
+
+        return [
+            'new_today' => $newToday,
+            'contacted_today' => $contactedToday,
+            'activities_today' => $activitiesToday,
+            'converted_week' => $convertedWeek,
+            'interested_open' => $interestedOpen,
+        ];
     }
 
     public static function list(array $filters = []): array
@@ -53,6 +118,14 @@ final class LeadService
         if ($status === 'follow_due') {
             $where[] = "l.status IN ('follow_up','whatsapp','no_answer','interested')";
             $where[] = 'l.next_follow_up_at IS NOT NULL AND l.next_follow_up_at <= NOW()';
+        } elseif ($status === 'high') {
+            $where[] = "l.priority = 'high' AND l.status NOT IN ('burned','converted')";
+        } elseif ($status === 'mine') {
+            $mine = trim((string) ($filters['mine'] ?? ''));
+            if ($mine !== '') {
+                $where[] = 'l.employee_name = ?';
+                $params[] = $mine;
+            }
         } elseif ($status !== '' && $status !== 'all' && in_array($status, self::STATUSES, true)) {
             $where[] = 'l.status = ?';
             $params[] = $status;
@@ -69,6 +142,12 @@ final class LeadService
         if ($employee !== '') {
             $where[] = 'l.employee_name = ?';
             $params[] = $employee;
+        }
+
+        $priority = trim((string) ($filters['priority'] ?? ''));
+        if ($priority !== '' && in_array($priority, self::PRIORITIES, true)) {
+            $where[] = 'l.priority = ?';
+            $params[] = $priority;
         }
 
         $source = trim((string) ($filters['source'] ?? ''));
@@ -88,7 +167,11 @@ final class LeadService
             $params[] = $to;
         }
 
-        $sql = 'SELECT l.* FROM leads l WHERE ' . implode(' AND ', $where) . ' ORDER BY l.updated_at DESC, l.id DESC LIMIT 500';
+        $order = "CASE l.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
+                  CASE WHEN l.next_follow_up_at IS NOT NULL AND l.next_follow_up_at <= NOW() THEN 0 ELSE 1 END,
+                  l.updated_at DESC, l.id DESC";
+
+        $sql = 'SELECT l.* FROM leads l WHERE ' . implode(' AND ', $where) . " ORDER BY {$order} LIMIT 500";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -97,10 +180,18 @@ final class LeadService
     public static function employees(): array
     {
         $pdo = Connection::get();
-        $rows = $pdo->query(
-            "SELECT DISTINCT employee_name FROM leads WHERE employee_name <> '' ORDER BY employee_name"
+        $fromLeads = $pdo->query(
+            "SELECT DISTINCT employee_name AS name FROM leads WHERE employee_name <> ''"
         )->fetchAll(\PDO::FETCH_COLUMN);
-        return array_values(array_map('strval', $rows ?: []));
+        $fromStaff = $pdo->query(
+            "SELECT name FROM platform_admins WHERE role = 'employee' AND is_active = 1"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        $names = array_unique(array_merge(
+            array_map('strval', $fromStaff ?: []),
+            array_map('strval', $fromLeads ?: [])
+        ));
+        sort($names, SORT_STRING);
+        return array_values($names);
     }
 
     public static function find(int $id): array
@@ -114,7 +205,17 @@ final class LeadService
         return $row;
     }
 
-    public static function create(array $data, ?int $createdBy = null): array
+    public static function activities(int $leadId): array
+    {
+        self::find($leadId);
+        $stmt = Connection::get()->prepare(
+            'SELECT * FROM lead_activities WHERE lead_id = ? ORDER BY id DESC LIMIT 100'
+        );
+        $stmt->execute([$leadId]);
+        return $stmt->fetchAll();
+    }
+
+    public static function create(array $data, ?int $createdBy = null, ?string $adminName = null): array
     {
         $person = trim((string) ($data['person_name'] ?? ''));
         $phone = self::normalizePhone((string) ($data['phone'] ?? ''));
@@ -125,23 +226,33 @@ final class LeadService
             throw new \InvalidArgumentException('شماره تماس الزامی است');
         }
 
+        $dup = self::findByPhone($phone);
+        if ($dup) {
+            throw new \InvalidArgumentException('این شماره قبلاً ثبت شده: ' . ($dup['person_name'] ?? ''));
+        }
+
         $status = (string) ($data['status'] ?? 'new');
         if (!in_array($status, self::STATUSES, true)) {
             $status = 'new';
+        }
+        $priority = (string) ($data['priority'] ?? 'normal');
+        if (!in_array($priority, self::PRIORITIES, true)) {
+            $priority = 'normal';
         }
 
         $pdo = Connection::get();
         $stmt = $pdo->prepare(
             'INSERT INTO leads
-             (person_name, business_name, phone, status, source, employee_name, notes,
+             (person_name, business_name, phone, status, priority, source, employee_name, notes,
               next_follow_up_at, last_contacted_at, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?,?)'
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)'
         );
         $stmt->execute([
             $person,
             trim((string) ($data['business_name'] ?? '')),
             $phone,
             $status,
+            $priority,
             trim((string) ($data['source'] ?? 'google')) ?: 'google',
             trim((string) ($data['employee_name'] ?? '')),
             trim((string) ($data['notes'] ?? '')),
@@ -149,12 +260,43 @@ final class LeadService
             self::nullableDatetime($data['last_contacted_at'] ?? null),
             $createdBy,
         ]);
-        return self::find((int) $pdo->lastInsertId());
+        $id = (int) $pdo->lastInsertId();
+        self::addActivity($id, 'created', 'سرنخ ثبت شد', $createdBy, $adminName, null, $status);
+        return self::find($id);
     }
 
-    public static function update(int $id, array $data): array
+    /** @return array{created:int,skipped:int,errors:list<string>} */
+    public static function bulkImport(array $rows, array $defaults, ?int $createdBy = null, ?string $adminName = null): array
     {
-        self::find($id);
+        $created = 0;
+        $skipped = 0;
+        $errors = [];
+        foreach ($rows as $i => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            try {
+                $data = array_merge($defaults, $row);
+                if (trim((string) ($data['person_name'] ?? '')) === '' && trim((string) ($data['phone'] ?? '')) !== '') {
+                    $data['person_name'] = 'سرنخ ' . self::normalizePhone((string) $data['phone']);
+                }
+                self::create($data, $createdBy, $adminName);
+                $created++;
+            } catch (\InvalidArgumentException $e) {
+                $msg = $e->getMessage();
+                if (str_contains($msg, 'قبلاً ثبت شده')) {
+                    $skipped++;
+                } else {
+                    $errors[] = 'ردیف ' . ($i + 1) . ': ' . $msg;
+                }
+            }
+        }
+        return ['created' => $created, 'skipped' => $skipped, 'errors' => array_slice($errors, 0, 20)];
+    }
+
+    public static function update(int $id, array $data, ?int $adminId = null, ?string $adminName = null): array
+    {
+        $before = self::find($id);
         $fields = [];
         $params = [];
 
@@ -175,11 +317,27 @@ final class LeadService
                 if ($key === 'phone' && $val === '') {
                     throw new \InvalidArgumentException('شماره تماس الزامی است');
                 }
+                if ($key === 'phone') {
+                    $dup = self::findByPhone($val);
+                    if ($dup && (int) $dup['id'] !== $id) {
+                        throw new \InvalidArgumentException('این شماره قبلاً برای سرنخ دیگری ثبت شده');
+                    }
+                }
                 $fields[] = "{$key} = ?";
                 $params[] = $val;
             }
         }
 
+        if (array_key_exists('priority', $data)) {
+            $priority = (string) $data['priority'];
+            if (!in_array($priority, self::PRIORITIES, true)) {
+                throw new \InvalidArgumentException('اولویت نامعتبر است');
+            }
+            $fields[] = 'priority = ?';
+            $params[] = $priority;
+        }
+
+        $newStatus = null;
         if (array_key_exists('status', $data)) {
             $status = (string) $data['status'];
             if (!in_array($status, self::STATUSES, true)) {
@@ -187,6 +345,7 @@ final class LeadService
             }
             $fields[] = 'status = ?';
             $params[] = $status;
+            $newStatus = $status;
             if (in_array($status, ['follow_up', 'whatsapp', 'no_answer', 'interested', 'burned', 'converted'], true)
                 && !array_key_exists('last_contacted_at', $data)) {
                 $fields[] = 'last_contacted_at = COALESCE(last_contacted_at, NOW())';
@@ -202,16 +361,72 @@ final class LeadService
             $params[] = self::nullableDatetime($data['last_contacted_at']);
         }
 
-        if (!$fields) {
-            return self::find($id);
+        if ($fields) {
+            $params[] = $id;
+            Connection::get()->prepare(
+                'UPDATE leads SET ' . implode(', ', $fields) . ' WHERE id = ?'
+            )->execute($params);
         }
 
-        $params[] = $id;
-        Connection::get()->prepare(
-            'UPDATE leads SET ' . implode(', ', $fields) . ' WHERE id = ?'
-        )->execute($params);
+        if ($newStatus !== null && $newStatus !== ($before['status'] ?? '')) {
+            self::addActivity(
+                $id,
+                'status',
+                'تغییر وضعیت',
+                $adminId,
+                $adminName,
+                (string) ($before['status'] ?? ''),
+                $newStatus
+            );
+        }
 
         return self::find($id);
+    }
+
+    /** ثبت نتیجه تماس / واتساپ در یک مرحله */
+    public static function logOutcome(int $id, array $data, ?int $adminId = null, ?string $adminName = null): array
+    {
+        $before = self::find($id);
+        $type = (string) ($data['type'] ?? 'call');
+        if (!in_array($type, ['call', 'whatsapp', 'note'], true)) {
+            $type = 'call';
+        }
+        $status = (string) ($data['status'] ?? $before['status']);
+        if (!in_array($status, self::STATUSES, true)) {
+            $status = (string) $before['status'];
+        }
+        $note = trim((string) ($data['notes'] ?? $data['message'] ?? ''));
+        $follow = $data['next_follow_up_at'] ?? null;
+
+        $payload = [
+            'status' => $status,
+            'last_contacted_at' => date('Y-m-d H:i:s'),
+        ];
+        if ($follow !== null) {
+            $payload['next_follow_up_at'] = $follow;
+        }
+        if ($note !== '') {
+            $prevNotes = trim((string) ($before['notes'] ?? ''));
+            $stamp = date('Y-m-d H:i');
+            $payload['notes'] = $prevNotes === ''
+                ? "[{$stamp}] {$note}"
+                : $prevNotes . "\n[{$stamp}] {$note}";
+        }
+        if (array_key_exists('priority', $data)) {
+            $payload['priority'] = $data['priority'];
+        }
+
+        $lead = self::update($id, $payload, $adminId, $adminName);
+        self::addActivity(
+            $id,
+            $type,
+            $note !== '' ? $note : ($type === 'whatsapp' ? 'ارسال واتساپ' : ($type === 'call' ? 'تماس تلفنی' : 'یادداشت')),
+            $adminId,
+            $adminName,
+            (string) ($before['status'] ?? ''),
+            $status
+        );
+        return $lead;
     }
 
     public static function delete(int $id): void
@@ -219,7 +434,45 @@ final class LeadService
         Connection::get()->prepare('DELETE FROM leads WHERE id = ?')->execute([$id]);
     }
 
-    private static function normalizePhone(string $phone): string
+    public static function addActivity(
+        int $leadId,
+        string $type,
+        string $message,
+        ?int $adminId = null,
+        ?string $adminName = null,
+        ?string $oldStatus = null,
+        ?string $newStatus = null
+    ): void {
+        try {
+            Connection::get()->prepare(
+                'INSERT INTO lead_activities (lead_id, admin_id, admin_name, type, message, old_status, new_status)
+                 VALUES (?,?,?,?,?,?,?)'
+            )->execute([
+                $leadId,
+                $adminId,
+                $adminName ?? '',
+                $type,
+                $message,
+                $oldStatus,
+                $newStatus,
+            ]);
+        } catch (\Throwable) {
+            // جدول ممکن است هنوز ساخته نشده باشد؛ نادیده بگیر
+        }
+    }
+
+    private static function findByPhone(string $phone): ?array
+    {
+        if ($phone === '') {
+            return null;
+        }
+        $stmt = Connection::get()->prepare('SELECT * FROM leads WHERE phone = ? LIMIT 1');
+        $stmt->execute([$phone]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public static function normalizePhone(string $phone): string
     {
         $phone = preg_replace('/[^\d+]/', '', trim($phone)) ?? '';
         if (str_starts_with($phone, '98') && strlen($phone) >= 12) {

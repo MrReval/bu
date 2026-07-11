@@ -419,6 +419,7 @@ CREATE TABLE IF NOT EXISTS leads (
     business_name VARCHAR(200) NOT NULL DEFAULT '',
     phone VARCHAR(30) NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'new',
+    priority VARCHAR(20) NOT NULL DEFAULT 'normal',
     source VARCHAR(50) NOT NULL DEFAULT 'google',
     employee_name VARCHAR(150) NOT NULL DEFAULT '',
     notes TEXT,
@@ -428,8 +429,24 @@ CREATE TABLE IF NOT EXISTS leads (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_leads_status (status),
+    KEY idx_leads_priority (priority),
     KEY idx_leads_phone (phone),
     KEY idx_leads_created (created_at),
     KEY idx_leads_followup (next_follow_up_at),
     KEY idx_leads_employee (employee_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS lead_activities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    admin_id INT NULL,
+    admin_name VARCHAR(150) NOT NULL DEFAULT '',
+    type VARCHAR(30) NOT NULL DEFAULT 'note',
+    message TEXT,
+    old_status VARCHAR(30) NULL,
+    new_status VARCHAR(30) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_lead_act_lead (lead_id),
+    KEY idx_lead_act_created (created_at),
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
