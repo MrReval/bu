@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus, Pencil, Trash2, Phone, Search, Filter, MessageCircle,
   UserRound, Building2, Flame, Clock, CheckCircle2, Ban, Target,
-  Upload, Star, History, Zap, TrendingUp, CalendarPlus,
+  Upload, Star, History, Zap, TrendingUp, CalendarPlus, Copy, UserPlus,
 } from 'lucide-react';
 import { api, formatDate, getAdmin, isSuperAdmin } from '../api';
 import { useToast } from '../context/Toast';
 import Modal from '../components/Modal';
 import JalaliDateInput from '../components/JalaliDateInput';
+import { todayGregorian } from '../../../shared/jalali';
 
 const fa = (n) => new Intl.NumberFormat('fa-IR').format(n || 0);
 
@@ -125,6 +126,21 @@ function followLabel(d) {
   if (diff === 0) return 'امروز';
   if (diff === 1) return 'فردا';
   return formatDate(d);
+}
+
+function addDays(n) {
+  const d = new Date(`${todayGregorian()}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export default function Leads() {
@@ -290,15 +306,47 @@ export default function Leads() {
     }
   };
 
+  const snooze = async (lead, days) => {
+    try {
+      await api(`/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          next_follow_up_at: addDays(days),
+          status: lead.status === 'new' ? 'follow_up' : lead.status,
+        }),
+      });
+      show(days === 0 ? 'پیگیری برای امروز تنظیم شد' : `پیگیری به ${days === 1 ? 'فردا' : `${days} روز بعد`} موکول شد`);
+      load();
+    } catch (err) {
+      show(err.message, 'error');
+    }
+  };
+
+  const claimLead = async (lead) => {
+    if (!me?.name) return;
+    try {
+      await api(`/leads/${lead.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ employee_name: me.name }),
+      });
+      show('سرنخ به شما اختصاص یافت');
+      load();
+    } catch (err) {
+      show(err.message, 'error');
+    }
+  };
+
+  const copyPhone = async (phone) => {
+    const ok = await copyText(phone);
+    show(ok ? 'شماره کپی شد' : 'کپی نشد', ok ? 'success' : 'error');
+  };
+
   const openOutcome = (lead, type = 'call') => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const ymd = tomorrow.toISOString().slice(0, 10);
     setOutcomeLead(lead);
     setOutcome({
       status: type === 'whatsapp' ? 'whatsapp' : 'follow_up',
       notes: '',
-      next_follow_up_at: ymd,
+      next_follow_up_at: addDays(1),
       type,
     });
     if (type === 'call') {
@@ -527,11 +575,11 @@ export default function Leads() {
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">از تاریخ</label>
-              <JalaliDateInput value={from} onChange={setFrom} className={field} />
+              <JalaliDateInput value={from} onChange={setFrom} placeholder="از تاریخ" />
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">تا تاریخ</label>
-              <JalaliDateInput value={to} onChange={setTo} className={field} />
+              <JalaliDateInput value={to} onChange={setTo} placeholder="تا تاریخ" />
             </div>
             <div className="sm:col-span-2 lg:col-span-5 flex justify-end">
               <button type="button" onClick={clearFilters} className="text-sm text-slate-500 hover:text-brand-600">
@@ -543,10 +591,21 @@ export default function Leads() {
 
         <div className="divide-y divide-slate-100">
           {leads.length === 0 && (
-            <div className="py-16 text-center text-slate-400 text-sm">سرنخی یافت نشد</div>
+            <div className="py-16 px-6 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                <Target size={26} />
+              </div>
+              <div className="font-bold text-slate-700 mb-1">سرنخی در این فیلتر نیست</div>
+              <p className="text-sm text-slate-400 mb-4">می‌توانید سرنخ جدید ثبت کنید یا لیست را گروهی ایمپورت کنید.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={openCreate} className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold">سرنخ جدید</button>
+                <button type="button" onClick={() => setBulkOpen(true)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600">ایمپورت گروهی</button>
+              </div>
+            </div>
           )}
           {leads.map((lead) => {
             const overdue = lead.next_follow_up_at && new Date(lead.next_follow_up_at) <= new Date();
+            const unassigned = !lead.employee_name;
             return (
               <div
                 key={lead.id}
@@ -562,6 +621,9 @@ export default function Leads() {
                       </button>
                       <StatusBadge status={lead.status} />
                       <PriorityBadge priority={lead.priority} />
+                      {unassigned && (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">بدون مسئول</span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                       {lead.business_name && (
@@ -570,10 +632,17 @@ export default function Leads() {
                           {lead.business_name}
                         </span>
                       )}
-                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-700" dir="ltr">
+                      <button
+                        type="button"
+                        onClick={() => copyPhone(lead.phone)}
+                        className="inline-flex items-center gap-1.5 font-medium text-slate-700 hover:text-brand-700"
+                        dir="ltr"
+                        title="کپی شماره"
+                      >
                         <Phone size={14} className="text-slate-400" />
                         {lead.phone}
-                      </span>
+                        <Copy size={12} className="text-slate-300" />
+                      </button>
                       {lead.employee_name && (
                         <span className="inline-flex items-center gap-1.5">
                           <UserRound size={14} className="text-slate-400" />
@@ -593,6 +662,17 @@ export default function Leads() {
                     {lead.notes && (
                       <p className="mt-2 text-sm text-slate-600 line-clamp-2 whitespace-pre-line">{lead.notes}</p>
                     )}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <button type="button" onClick={() => snooze(lead, 0)} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">امروز</button>
+                      <button type="button" onClick={() => snooze(lead, 1)} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">فردا</button>
+                      <button type="button" onClick={() => snooze(lead, 3)} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">۳ روز بعد</button>
+                      {unassigned && (
+                        <button type="button" onClick={() => claimLead(lead)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100">
+                          <UserPlus size={12} />
+                          برداشتن سرنخ
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5 shrink-0">
@@ -701,7 +781,11 @@ export default function Leads() {
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block">تاریخ پیگیری بعدی</label>
-              <JalaliDateInput value={form.next_follow_up_at} onChange={(v) => setForm({ ...form, next_follow_up_at: v })} className={field} />
+              <JalaliDateInput
+                value={form.next_follow_up_at}
+                onChange={(v) => setForm({ ...form, next_follow_up_at: v })}
+                placeholder="انتخاب تاریخ پیگیری"
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-slate-500 mb-1 block">یادداشت</label>
@@ -776,7 +860,7 @@ export default function Leads() {
             <JalaliDateInput
               value={outcome.next_follow_up_at}
               onChange={(v) => setOutcome({ ...outcome, next_follow_up_at: v })}
-              className={field}
+              placeholder="تاریخ پیگیری بعدی"
             />
           </div>
           <div className="flex justify-end gap-2">
