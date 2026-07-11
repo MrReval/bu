@@ -16,12 +16,19 @@ const field = 'w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:borde
 
 const emptyForm = {
   name: '', domain: '', admin_name: 'مدیر', admin_phone: '', admin_email: '', admin_password: '',
-  package_id: '', expires_at: '', status: 'active',
+  package_id: '', expires_at: '', status: 'active', business_type: 'beauty_salon',
+};
+
+const TYPE_LABEL = {
+  beauty_salon: 'سالن زیبایی',
+  dental_clinic: 'دندان‌پزشکی',
+  medical_practice: 'مطب پزشکی',
 };
 
 export default function Sites() {
   const [sites, setSites] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [verticals, setVerticals] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -32,6 +39,7 @@ export default function Sites() {
   const load = () => {
     api('/sites').then(setSites).catch((e) => show(e.message, 'error'));
     api('/packages').then(setPackages).catch(() => {});
+    api('/verticals').then(setVerticals).catch(() => {});
   };
   useEffect(load, []);
 
@@ -47,6 +55,7 @@ export default function Sites() {
       ...emptyForm,
       name: s.name, domain: s.domain, status: s.status,
       package_id: s.package_id || '', expires_at: (s.expires_at || '').slice(0, 10),
+      business_type: s.business_type || 'beauty_salon',
     });
     setModalOpen(true);
   };
@@ -63,6 +72,7 @@ export default function Sites() {
             status: form.status,
             package_id: form.package_id || null,
             expires_at: form.expires_at || null,
+            business_type: form.business_type,
           }),
         });
         show('سایت ویرایش شد');
@@ -73,6 +83,7 @@ export default function Sites() {
             name: form.name,
             domain: form.domain,
             package_id: form.package_id || null,
+            business_type: form.business_type,
             admin_name: form.admin_name,
             admin_phone: form.admin_phone,
             admin_email: form.admin_email,
@@ -141,6 +152,7 @@ export default function Sites() {
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="text-right px-5 py-3 font-medium">نام</th>
+                <th className="text-right px-5 py-3 font-medium">نوع</th>
                 <th className="text-right px-5 py-3 font-medium">دامنه</th>
                 <th className="text-right px-5 py-3 font-medium">پکیج</th>
                 <th className="text-right px-5 py-3 font-medium">مشتریان</th>
@@ -155,6 +167,11 @@ export default function Sites() {
                   <td className="px-5 py-3 font-medium text-slate-700">
                     {s.name}
                     <div className="text-xs text-slate-400" dir="ltr">{s.admin_email}</div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+                      {TYPE_LABEL[s.business_type] || TYPE_LABEL.beauty_salon}
+                    </span>
                   </td>
                   <td className="px-5 py-3 text-slate-500" dir="ltr">
                     <a href={`https://${s.domain}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-brand-600">
@@ -204,8 +221,37 @@ export default function Sites() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'ویرایش سایت' : 'ساخت سایت جدید'} wide>
         <form onSubmit={save} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className="block text-sm text-slate-600 mb-2">نوع کسب‌وکار / قالب</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {(verticals.length ? verticals : [
+                { key: 'beauty_salon', label: 'سالن زیبایی', description: 'آرایشگاه و زیبایی' },
+                { key: 'dental_clinic', label: 'کلینیک دندان‌پزشکی', description: 'مطب و کلینیک دندان' },
+                { key: 'medical_practice', label: 'مطب پزشکی / تراپی', description: 'پزشک و تراپیست' },
+              ]).map((v) => {
+                const active = form.business_type === v.key;
+                return (
+                  <button
+                    key={v.key}
+                    type="button"
+                    disabled={!!editing}
+                    onClick={() => setForm({ ...form, business_type: v.key })}
+                    className={`text-right p-3 rounded-xl border transition ${
+                      active ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-200' : 'border-slate-200 hover:bg-slate-50'
+                    } ${editing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="font-bold text-sm text-slate-800">{v.label}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 leading-4">{v.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {editing && (
+              <p className="text-[11px] text-slate-400 mt-1.5">تغییر قالب بعد از ساخت، داده‌های seed را عوض نمی‌کند؛ فقط برچسب نوع ذخیره می‌شود.</p>
+            )}
+          </div>
           <div>
-            <label className="block text-sm text-slate-600 mb-1">نام سالن</label>
+            <label className="block text-sm text-slate-600 mb-1">نام کسب‌وکار</label>
             <input className={field} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div>

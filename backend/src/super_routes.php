@@ -22,6 +22,8 @@ return function (Router $router): void {
     // فقط سوپرادمین کامل
     $router->get('/api/v1/super/dashboard', [DashboardController::class, 'stats'], $super);
 
+    $router->get('/api/v1/super/verticals', [SiteController::class, 'verticals'], $super);
+
     $router->get('/api/v1/super/sites', [SiteController::class, 'index'], $super);
     $router->get('/api/v1/super/sites/{id}', [SiteController::class, 'show'], $super);
     $router->post('/api/v1/super/sites', [SiteController::class, 'store'], $super);

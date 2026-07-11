@@ -7,9 +7,15 @@ namespace Salon\Controllers\SuperAdmin;
 use Salon\Http\Request;
 use Salon\Http\Response;
 use Salon\Services\SiteService;
+use Salon\Tenant\VerticalRegistry;
 
 final class SiteController
 {
+    public static function verticals(Request $req): void
+    {
+        Response::json(VerticalRegistry::options());
+    }
+
     public static function index(Request $req): void
     {
         Response::json(SiteService::all());

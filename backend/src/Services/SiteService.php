@@ -46,13 +46,16 @@ final class SiteService
 
         $pdo->beginTransaction();
         try {
+            $businessType = \Salon\Tenant\VerticalRegistry::normalize($data['business_type'] ?? null);
+            $vertical = \Salon\Tenant\VerticalRegistry::get($businessType);
+
             $pdo->prepare(
-                'INSERT INTO sites (name, domain, status, package_id, expires_at) VALUES (?, ?, "active", ?, ?)'
-            )->execute([$name, $domain, $packageId, $expiresAt]);
+                'INSERT INTO sites (name, domain, status, package_id, expires_at, business_type) VALUES (?, ?, "active", ?, ?, ?)'
+            )->execute([$name, $domain, $packageId, $expiresAt, $businessType]);
             $siteId = (int) $pdo->lastInsertId();
 
-            // داده‌های اولیه سالن
-            Migrator::seedDefaults($siteId);
+            // داده‌های اولیه بر اساس قالب عمودی
+            Migrator::seedDefaults($siteId, $businessType);
             $pdo->prepare('UPDATE salon_settings SET name = ? WHERE site_id = ?')->execute([$name, $siteId]);
 
             // کاربر مدیر سالن
@@ -60,7 +63,7 @@ final class SiteService
 
             // پرسنل پیش‌فرض به نام مدیر
             $pdo->prepare('INSERT INTO staff (site_id, user_id, display_name, color_hex) VALUES (?, ?, ?, ?)')
-                ->execute([$siteId, $adminId, $adminName, '#be185d']);
+                ->execute([$siteId, $adminId, $adminName, $vertical['staff_color']]);
             $staffId = (int) $pdo->lastInsertId();
 
             // آواتار و نمونه‌کار پیش‌فرض برای پرسنل مدیر
@@ -125,6 +128,10 @@ final class SiteService
         if (array_key_exists('expires_at', $data)) {
             $fields[] = 'expires_at = ?';
             $vals[] = !empty($data['expires_at']) ? (string) $data['expires_at'] : null;
+        }
+        if (array_key_exists('business_type', $data)) {
+            $fields[] = 'business_type = ?';
+            $vals[] = \Salon\Tenant\VerticalRegistry::normalize($data['business_type'] ?? null);
         }
 
         if (!empty($fields)) {

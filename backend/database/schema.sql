@@ -12,10 +12,12 @@ CREATE TABLE IF NOT EXISTS sites (
     name VARCHAR(191) NOT NULL,
     domain VARCHAR(191) NOT NULL UNIQUE,
     slug VARCHAR(191) NOT NULL DEFAULT 'salon',
+    business_type VARCHAR(32) NOT NULL DEFAULT 'beauty_salon',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     package_id INT NULL,
     expires_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_sites_business_type (business_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS platform_admins (

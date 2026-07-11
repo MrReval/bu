@@ -37,6 +37,7 @@ final class Migrator
         self::ensureColumn('platform_admins', 'role', "VARCHAR(30) NOT NULL DEFAULT 'super_admin'");
         self::ensureColumn('platform_admins', 'is_active', 'TINYINT NOT NULL DEFAULT 1');
         self::ensureColumn('leads', 'priority', "VARCHAR(20) NOT NULL DEFAULT 'normal'");
+        self::ensureColumn('sites', 'business_type', "VARCHAR(32) NOT NULL DEFAULT 'beauty_salon'");
     }
 
     private static function ensureColumn(string $table, string $column, string $definition): void
@@ -166,65 +167,78 @@ final class Migrator
         }
     }
 
-    /** داده‌های پیش‌فرض برای یک سایت مشخص */
-    public static function seedDefaults(int $siteId): void
+    /** داده‌های پیش‌فرض برای یک سایت مشخص (بر اساس قالب عمودی) */
+    public static function seedDefaults(int $siteId, string $businessType = 'beauty_salon'): void
     {
         $pdo = Connection::get();
+        $vertical = \Salon\Tenant\VerticalRegistry::get($businessType);
+        $defaultName = $vertical['default_name'];
 
         $exists = $pdo->prepare('SELECT COUNT(*) FROM salon_settings WHERE site_id = ?');
         $exists->execute([$siteId]);
         if ((int) $exists->fetchColumn() === 0) {
-            $pdo->prepare("INSERT INTO salon_settings (site_id, name) VALUES (?, 'سالن زیبایی')")
-                ->execute([$siteId]);
+            $pdo->prepare(
+                'INSERT INTO salon_settings (site_id, name, primary_color, secondary_color, hero_title, hero_subtitle) VALUES (?, ?, ?, ?, ?, ?)'
+            )->execute([
+                $siteId,
+                $defaultName,
+                $vertical['primary_color'],
+                $vertical['secondary_color'],
+                $vertical['labels']['hero_title'],
+                $vertical['labels']['hero_subtitle'],
+            ]);
+        } else {
+            $pdo->prepare(
+                'UPDATE salon_settings SET primary_color = COALESCE(NULLIF(primary_color, ""), ?),
+                 secondary_color = COALESCE(NULLIF(secondary_color, ""), ?) WHERE site_id = ?'
+            )->execute([$vertical['primary_color'], $vertical['secondary_color'], $siteId]);
         }
 
-        $hours = json_encode([
-            '0' => ['open' => '09:00', 'close' => '21:00', 'closed' => false],
-            '1' => ['open' => '09:00', 'close' => '21:00', 'closed' => false],
-            '2' => ['open' => '09:00', 'close' => '21:00', 'closed' => false],
-            '3' => ['open' => '09:00', 'close' => '21:00', 'closed' => false],
-            '4' => ['open' => '09:00', 'close' => '21:00', 'closed' => false],
-            '5' => ['open' => '', 'close' => '', 'closed' => true],
-            '6' => ['open' => '09:00', 'close' => '21:00', 'closed' => false],
-        ], JSON_UNESCAPED_UNICODE);
+        $hours = json_encode($vertical['hours'], JSON_UNESCAPED_UNICODE);
         $pdo->prepare('UPDATE salon_settings SET business_hours_json = ? WHERE site_id = ?')
             ->execute([$hours, $siteId]);
+
+        // قوانین رزرو بر اساس قالب
+        $features = $vertical['features'];
+        $rules = [
+            'allow_staff_selection' => true,
+            'staff_selection_required' => !empty($features['staff_selection_required']),
+            'multi_service' => !empty($features['multi_service_booking']),
+            'auto_confirm' => false,
+        ];
+        $pdo->prepare('UPDATE salon_settings SET booking_rules_json = ? WHERE site_id = ?')
+            ->execute([json_encode($rules, JSON_UNESCAPED_UNICODE), $siteId]);
 
         $sections = $pdo->prepare('SELECT COUNT(*) FROM landing_sections WHERE site_id = ?');
         $sections->execute([$siteId]);
         if ((int) $sections->fetchColumn() === 0) {
-            $defaults = [
-                ['hero', 0, '{"use_settings":true}'],
-                ['services', 1, '{"title":"خدمات ما"}'],
-                ['about', 2, '{"title":"درباره ما"}'],
-                ['cta', 3, '{"title":"همین حالا نوبت بگیرید","button_text":"رزرو آنلاین","button_link":"/book"}'],
-            ];
             $stmt = $pdo->prepare('INSERT INTO landing_sections (site_id, type, sort_order, config_json) VALUES (?, ?, ?, ?)');
-            foreach ($defaults as $d) {
+            foreach ($vertical['landing'] as $d) {
                 $stmt->execute([$siteId, $d[0], $d[1], $d[2]]);
             }
         }
 
-        self::ensureCategories($siteId);
+        self::ensureCategories($siteId, $businessType);
 
         $svcs = $pdo->prepare('SELECT COUNT(*) FROM services WHERE site_id = ?');
         $svcs->execute([$siteId]);
         if ((int) $svcs->fetchColumn() === 0) {
-            $catNail = self::categoryId($siteId, 'ناخن');
-            $catHair = self::categoryId($siteId, 'مو');
-            $pdo->prepare(
-                'INSERT INTO services (site_id, category_id, name, description, duration_minutes, price) VALUES (?,?,?,?,?,?)'
-            );
             $ins = $pdo->prepare(
                 'INSERT INTO services (site_id, category_id, name, description, duration_minutes, price) VALUES (?,?,?,?,?,?)'
             );
-            $ins->execute([$siteId, $catNail, 'مانیکور', 'مانیکور حرفه‌ای', 45, 250000]);
-            $ins->execute([$siteId, $catNail, 'پدیکور', 'پدیکور کامل', 60, 350000]);
-            $ins->execute([$siteId, $catNail, 'کاشت ناخن', 'کاشت و طراحی', 90, 800000]);
-            $ins->execute([$siteId, $catHair, 'کوتاهی مو', 'کوتاهی و استایل', 30, 200000]);
+            foreach ($vertical['services'] as [$catName, $name, $desc, $mins, $price]) {
+                $catId = self::categoryId($siteId, $catName);
+                $ins->execute([$siteId, $catId, $name, $desc, $mins, $price]);
+            }
         }
 
-        self::seedDefaultImages($siteId);
+        // گالری فقط برای قالب‌هایی که فعال است
+        if (!empty($features['gallery'])) {
+            self::seedDefaultImages($siteId);
+        } else {
+            // فقط هیرو/لوگو اگر موجود باشد
+            self::seedDefaultImages($siteId);
+        }
     }
 
     /** مسیر پوشه‌ی عکس‌های دموی اولیه (import/uploads) */
@@ -393,25 +407,26 @@ final class Migrator
         return $id ? (int) $id : null;
     }
 
-    /** دسته‌های استاندارد برای یک سایت */
-    public static function ensureCategories(int $siteId): void
+    /** دسته‌های استاندارد برای یک سایت (بر اساس قالب) */
+    public static function ensureCategories(int $siteId, string $businessType = 'beauty_salon'): void
     {
         $pdo = Connection::get();
-        $categories = [
-            ['ناخن', 0], ['مو', 1], ['پوست', 2], ['میک آپ', 3],
-            ['مژه', 4], ['اصلاح', 5], ['میکروبلیدینگ', 6],
-        ];
+        $vertical = \Salon\Tenant\VerticalRegistry::get($businessType);
+        $categories = $vertical['categories'];
         $check = $pdo->prepare('SELECT id FROM service_categories WHERE site_id = ? AND name = ?');
         $insert = $pdo->prepare(
             'INSERT INTO service_categories (site_id, name, sort_order, is_active) VALUES (?, ?, ?, 1)'
         );
-        foreach ($categories as [$name, $order]) {
+        foreach ($categories as $order => $name) {
             $check->execute([$siteId, $name]);
             if (!$check->fetch()) {
                 $insert->execute([$siteId, $name, $order]);
             }
         }
-        self::ensureDemoServicesForEmptyCategories($siteId);
+        // دموی قدیمی فقط برای سالن زیبایی
+        if (\Salon\Tenant\VerticalRegistry::normalize($businessType) === \Salon\Tenant\VerticalRegistry::BEAUTY) {
+            self::ensureDemoServicesForEmptyCategories($siteId);
+        }
     }
 
     public static function ensureDemoServicesForEmptyCategories(int $siteId): void

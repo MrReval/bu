@@ -13,6 +13,7 @@ use Salon\Services\StaffProfileService;
 use Salon\Services\UploadService;
 use Salon\Tenant\FeatureGate;
 use Salon\Tenant\TenantContext;
+use Salon\Tenant\VerticalRegistry;
 
 final class PublicController
 {
@@ -40,6 +41,15 @@ final class PublicController
         }
         unset($row['site_id']);
         $row['features'] = FeatureGate::enabledKeys();
+
+        // قالب عمودی (سالن / دندان / مطب)
+        $site = TenantContext::site() ?: [];
+        $businessType = VerticalRegistry::normalize($site['business_type'] ?? null);
+        $vertical = VerticalRegistry::get($businessType);
+        $row['business_type'] = $businessType;
+        $row['vertical_label'] = $vertical['label'];
+        $row['labels'] = $vertical['labels'];
+        $row['vertical_features'] = $vertical['features'];
 
         // آیا درگاه پرداخت فعال است (برای دریافت بیعانه)
         $pay = $pdo->prepare(
